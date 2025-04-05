@@ -137,21 +137,17 @@
       
       <div class="compare-result-content">
         <div class="metrics-selector">
-          <el-select
-            v-model="selectedMetrics"
-            multiple
-            collapse-tags
-            collapse-tags-tooltip
-            placeholder="选择指标"
-            style="width: 100%"
-          >
-            <el-option
-              v-for="metric in availableMetrics"
-              :key="metric.value"
-              :label="metric.label"
-              :value="metric.value"
-            />
-          </el-select>
+          <div class="metrics-selector-title">选择指标:</div>
+          <el-checkbox-group v-model="selectedMetrics" @change="handleMetricsChange">
+            <el-checkbox 
+              v-for="metric in availableMetrics" 
+              :key="metric.value" 
+              :label="metric.value"
+              class="metric-checkbox"
+            >
+              {{ metric.label }}
+            </el-checkbox>
+          </el-checkbox-group>
         </div>
 
         <el-tabs v-model="activeChartTab" @tab-click="handleChartTabChange">
@@ -463,32 +459,32 @@ export default {
       const cityAverages = comparisonData.value.map(city => {
         const result = {}
         
-        availableMetrics.forEach(metric => {
-          const values = city.data.map(item => parseFloat(item[metric.value]) || 0)
+        selectedMetrics.value.forEach(metric => {
+          const values = city.data.map(item => parseFloat(item[metric]) || 0)
           const validValues = values.filter(val => !isNaN(val))
           
           if (validValues.length > 0) {
             const sum = validValues.reduce((a, b) => a + b, 0)
-            result[metric.value] = sum / validValues.length
+            result[metric] = sum / validValues.length
           } else {
-            result[metric.value] = 0
+            result[metric] = 0
           }
         })
         
         return result
       })
       
-      availableMetrics.forEach(metric => {
+      selectedMetrics.value.forEach(metric => {
         const row = {
-          metric: metric.label
+          metric: availableMetrics.find(m => m.value === metric)?.label || metric
         }
         
         cityAverages.forEach((cityAvg, index) => {
-          row['city' + index] = cityAvg[metric.value].toFixed(2)
+          row['city' + index] = cityAvg[metric].toFixed(2)
         })
         
         if (cityAverages.length >= 2) {
-          const values = cityAverages.map(city => city[metric.value])
+          const values = cityAverages.map(city => city[metric])
           const max = Math.max(...values)
           const min = Math.min(...values)
           
@@ -786,6 +782,10 @@ export default {
       lineChartInstance.setOption(option)
     }
 
+    const handleMetricsChange = () => {
+      updateCharts();
+    }
+
     return {
       provinces,
       selectedCities,
@@ -803,6 +803,7 @@ export default {
       removeCity,
       handleCompareTypeChange,
       compareData,
+      handleMetricsChange,
       
       barChart,
       radarChart,
@@ -824,67 +825,131 @@ export default {
 <style scoped>
 .compare-container {
   padding: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  color: #303133;
+  font-weight: 600;
+}
+
+.city-select-card,
+.compare-type-card,
+.compare-result-card {
+  margin-bottom: 24px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  transition: box-shadow 0.3s ease;
+}
+
+.city-select-card:hover,
+.compare-type-card:hover,
+.compare-result-card:hover {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
 }
 
 .compare-type-card,
 .compare-result-card {
-  margin-top: 20px;
+  margin-top: 24px;
 }
 
 .city-select-content {
-  margin-bottom: 20px;
+  margin-bottom: 12px;
 }
 
 .city-select-item {
-  margin-bottom: 20px;
-  padding: 15px;
+  margin-bottom: 12px;
+  padding: 12px 15px;
   border: 1px solid #ebeef5;
-  border-radius: 4px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.03);
+  transition: all 0.3s ease;
+  background-color: #fafafa;
+}
+
+.city-select-item:hover {
+  border-color: #e6f7ff;
+  background-color: #f8f8f8;
 }
 
 .city-select-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 15px;
+  margin-bottom: 12px;
   font-weight: bold;
+  color: #1f2f3d;
+  font-size: 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed #ebeef5;
 }
 
 .add-city-btn {
   display: flex;
   justify-content: center;
-  margin-top: 15px;
+  margin-top: 12px;
 }
 
-.mt-20 {
-  margin-top: 20px;
+:deep(.el-form-item) {
+  margin-bottom: 14px;
+}
+
+:deep(.el-form--label-top .el-form-item__label) {
+  padding: 0 0 4px;
+}
+
+@media screen and (max-width: 768px) {
+  .city-select-item {
+    padding: 10px;
+    margin-bottom: 10px;
+  }
 }
 
 .compare-result-content {
-  padding: 10px 0;
+  padding: 16px 0;
 }
 
 .chart-container {
-  height: 400px;
-  margin-top: 20px;
+  height: 450px;
+  margin-top: 24px;
+  border-radius: 8px;
+  padding: 16px;
+  background-color: #fafafa;
+  border: 1px solid #f0f0f0;
 }
 
 .metrics-selector {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+  padding: 16px;
+  background-color: #f8fafc;
+  border-radius: 8px;
+  border: 1px dashed #e0e0e0;
+}
+
+.metrics-selector-title {
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: #303133;
+}
+
+.metric-checkbox {
+  margin-right: 20px;
+  margin-bottom: 6px;
 }
 
 .line-chart-controls {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 10px;
+  margin-top: 16px;
+  padding: 12px 16px;
+  background-color: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #f0f0f0;
 }
 
 .line-chart-legend {
@@ -895,31 +960,136 @@ export default {
 
 .health-recommendations {
   margin-top: 30px;
+  padding: 16px;
+  background-color: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #f0f0f0;
+}
+
+.health-recommendations h3 {
+  margin-bottom: 16px;
+  color: #303133;
+  font-weight: 600;
 }
 
 .recommendation-content {
-  padding: 10px;
-  background-color: #f8f8f8;
-  border-radius: 4px;
+  padding: 16px;
+  background-color: #fff;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  line-height: 1.6;
 }
 
 .data-table-container {
   margin-top: 30px;
+  padding: 16px;
+  background-color: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #f0f0f0;
 }
 
 .data-table-container h3 {
-  margin-bottom: 15px;
+  margin-bottom: 16px;
+  color: #303133;
+  font-weight: 600;
+}
+
+:deep(.el-table) {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+:deep(.el-table th) {
+  background-color: #f5f7fa;
+  font-weight: 600;
+}
+
+:deep(.el-tabs__nav) {
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+:deep(.el-tabs__item) {
+  padding: 0 24px;
+  height: 40px;
+  line-height: 40px;
+}
+
+:deep(.el-tabs__item.is-active) {
+  font-weight: 600;
+}
+
+:deep(.el-radio-button__inner) {
+  padding: 10px 20px;
+}
+
+:deep(.el-date-editor) {
+  width: 100%;
+}
+
+:deep(.el-collapse-item__header) {
+  font-weight: 500;
+  color: #303133;
+  background-color: #f8f8f8;
+  border-radius: 6px;
+  padding: 0 16px;
+}
+
+:deep(.el-collapse-item__wrap) {
+  background-color: transparent;
+}
+
+:deep(.el-checkbox) {
+  margin-right: 12px;
+}
+
+:deep(.el-checkbox__label) {
+  font-weight: 500;
+}
+
+:deep(.el-empty) {
+  padding: 60px 0;
+}
+
+.compare-type-content {
+  padding: 16px;
+}
+
+.time-selector {
+  padding: 16px;
+  background-color: #f8fafc;
+  border-radius: 8px;
+  margin-top: 20px;
 }
 
 @media screen and (max-width: 768px) {
+  .compare-container {
+    padding: 12px;
+  }
+  
+  .city-select-item {
+    padding: 16px;
+  }
+  
   .line-chart-controls {
     flex-direction: column;
     align-items: flex-start;
-    gap: 10px;
+    gap: 16px;
   }
   
   .chart-container {
-    height: 300px;
+    height: 350px;
+    padding: 12px;
+  }
+  
+  .health-recommendations, 
+  .data-table-container,
+  .metrics-selector {
+    padding: 12px;
+  }
+  
+  :deep(.el-tabs__item) {
+    padding: 0 16px;
   }
 }
 </style>
