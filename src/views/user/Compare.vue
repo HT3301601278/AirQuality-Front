@@ -784,6 +784,7 @@ export default {
 
     const handleMetricsChange = () => {
       updateCharts();
+      processTableData();
     }
 
     return {
