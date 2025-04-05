@@ -80,7 +80,57 @@ export default {
             store.commit('setToken', token)
             store.commit('setUser', user)
             
-            ElMessage.success('登录成功')
+            // 检查是否有待上传的头像
+            const pendingAvatar = localStorage.getItem('pendingAvatar')
+            const pendingUsername = localStorage.getItem('pendingAvatarUsername')
+            
+            if (pendingAvatar && pendingUsername === user.username) {
+              try {
+                // 从Base64字符串转回文件对象
+                const dataURLtoFile = (dataurl, filename) => {
+                  const arr = dataurl.split(',')
+                  const mime = arr[0].match(/:(.*?);/)[1]
+                  const bstr = atob(arr[1])
+                  let n = bstr.length
+                  const u8arr = new Uint8Array(n)
+                  while (n--) {
+                    u8arr[n] = bstr.charCodeAt(n)
+                  }
+                  return new File([u8arr], filename, { type: mime })
+                }
+                
+                // 创建文件对象并上传
+                const avatarFile = dataURLtoFile(pendingAvatar, 'avatar.jpg')
+                const formData = new FormData()
+                formData.append('file', avatarFile)
+                
+                const uploadResponse = await axios.post('/api/user/avatar', formData, {
+                  headers: {
+                    'Content-Type': 'multipart/form-data',
+                    'Authorization': `Bearer ${token}`
+                  }
+                })
+                
+                if (uploadResponse.data.code === 200) {
+                  // 更新用户信息中的头像
+                  store.commit('setUser', uploadResponse.data.data)
+                  ElMessage.success('登录成功并上传了头像')
+                } else {
+                  ElMessage.warning('登录成功，但头像上传失败：' + uploadResponse.data.message)
+                }
+                
+                // 清除localStorage中的临时头像数据
+                localStorage.removeItem('pendingAvatar')
+                localStorage.removeItem('pendingAvatarUsername')
+              } catch (uploadError) {
+                console.error('头像上传错误', uploadError)
+                ElMessage.warning('登录成功，但头像上传失败')
+                localStorage.removeItem('pendingAvatar')
+                localStorage.removeItem('pendingAvatarUsername')
+              }
+            } else {
+              ElMessage.success('登录成功')
+            }
             
             // 根据用户角色跳转到不同页面
             if (user.userType === 1) {

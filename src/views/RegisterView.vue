@@ -3,6 +3,26 @@
     <div class="register-box">
       <h2 class="title">空气质量监测系统</h2>
       <el-form :model="registerForm" :rules="registerRules" ref="registerFormRef" class="register-form">
+        <div class="form-header">
+          <div class="avatar-container">
+            <img v-if="avatarUrl" :src="avatarUrl" class="avatar-preview" />
+            <div v-else class="avatar-placeholder">
+              <el-icon><Avatar /></el-icon>
+            </div>
+            <el-upload
+              class="avatar-uploader"
+              action="#"
+              :auto-upload="false"
+              :show-file-list="false"
+              :on-change="handleAvatarChange"
+              accept="image/jpeg,image/png,image/gif,image/jpg">
+              <div class="upload-icon">
+                <el-icon><Plus /></el-icon>
+              </div>
+            </el-upload>
+          </div>
+        </div>
+        
         <el-form-item prop="username">
           <el-input v-model="registerForm.username" placeholder="请输入用户名">
             <template #prefix>
@@ -46,7 +66,7 @@
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { User, Lock, Message } from '@element-plus/icons-vue'
+import { User, Lock, Message, Avatar, Upload, Plus } from '@element-plus/icons-vue'
 import axios from 'axios'
 
 export default {
@@ -54,12 +74,17 @@ export default {
   components: {
     User,
     Lock,
-    Message
+    Message,
+    Avatar,
+    Upload,
+    Plus
   },
   setup() {
     const router = useRouter()
     const registerFormRef = ref(null)
     const loading = ref(false)
+    const avatarFile = ref(null)
+    const avatarUrl = ref('')
     
     const registerForm = reactive({
       username: '',
@@ -97,6 +122,11 @@ export default {
       ]
     }
     
+    const handleAvatarChange = (file) => {
+      avatarFile.value = file.raw
+      avatarUrl.value = URL.createObjectURL(file.raw)
+    }
+    
     const handleRegister = () => {
       registerFormRef.value.validate(async (valid) => {
         if (!valid) return
@@ -110,7 +140,22 @@ export default {
           })
           
           if (response.data.code === 200) {
-            ElMessage.success('注册成功，请登录')
+            // 如果有上传头像，则保存到localStorage，等登录后再上传
+            if (avatarFile.value) {
+              // 将文件转换为Base64字符串
+              const reader = new FileReader()
+              reader.readAsDataURL(avatarFile.value)
+              reader.onload = () => {
+                // 保存头像文件信息到localStorage
+                localStorage.setItem('pendingAvatar', reader.result)
+                localStorage.setItem('pendingAvatarUsername', registerForm.username)
+                
+                ElMessage.success('注册成功，请登录后上传头像')
+              }
+            } else {
+              ElMessage.success('注册成功，请登录')
+            }
+            
             router.push('/login')
           } else {
             ElMessage.error(response.data.message || '注册失败')
@@ -139,7 +184,9 @@ export default {
       registerRules,
       registerFormRef,
       loading,
-      handleRegister
+      handleRegister,
+      avatarUrl,
+      handleAvatarChange
     }
   }
 }
@@ -155,37 +202,132 @@ export default {
 }
 
 .register-box {
-  width: 400px;
+  width: 450px;
   padding: 40px;
   background-color: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
 }
 
 .title {
-  margin-bottom: 30px;
+  margin-bottom: 25px;
   text-align: center;
   color: #409eff;
-  font-size: 24px;
+  font-size: 26px;
+  font-weight: 600;
 }
 
 .register-form {
-  margin-top: 30px;
+  margin-top: 20px;
+}
+
+.form-header {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 30px;
+}
+
+.avatar-container {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  margin-bottom: 10px;
+}
+
+.avatar-preview {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid #e1f3ff;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+}
+
+.avatar-placeholder {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background-color: #f5f7fa;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border: 3px dashed #d9d9d9;
+}
+
+.avatar-placeholder .el-icon {
+  font-size: 50px;
+  color: #909399;
+}
+
+.avatar-uploader {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  background-color: #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 6px 0 rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.upload-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  color: #409eff;
+  background-color: #fff;
+  border: 1px solid #d9ecff;
+  border-radius: 50%;
+}
+
+.upload-icon:hover {
+  background-color: #ecf5ff;
 }
 
 .register-button {
   width: 100%;
-  margin-top: 10px;
+  margin-top: 15px;
+  height: 44px;
+  font-size: 16px;
+  border-radius: 8px;
 }
 
 .login-link {
-  margin-top: 15px;
+  margin-top: 20px;
   text-align: center;
   font-size: 14px;
+  color: #606266;
 }
 
 .login-link a {
   color: #409eff;
   text-decoration: none;
+  font-weight: 500;
+}
+
+.login-link a:hover {
+  text-decoration: underline;
+}
+
+.el-form-item {
+  margin-bottom: 20px;
+}
+
+.el-input :deep(.el-input__wrapper) {
+  padding: 0 15px;
+  height: 44px;
+  box-shadow: 0 0 0 1px #dcdfe6 inset;
+  border-radius: 8px;
+}
+
+.el-input :deep(.el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 1px #409eff inset;
+}
+
+.el-input :deep(.el-input__prefix) {
+  padding: 0 8px 0 0;
 }
 </style> 
