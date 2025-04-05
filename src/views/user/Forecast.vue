@@ -63,7 +63,7 @@
       </div>
       
       <div v-else class="forecast-content">
-        <el-tabs type="border-card">
+        <el-tabs type="border-card" @tab-click="handleTabClick">
           <el-tab-pane label="列表视图">
             <div class="data-table">
               <el-table :data="forecastData" stripe style="width: 100%">
@@ -315,7 +315,16 @@ const initChart = () => {
   
   try {
     // 创建图表实例
-    chartInstance.value = echarts.init(chartDomElement)
+    chartInstance.value = echarts.init(chartDomElement, null, {
+      renderer: 'canvas',
+      useDirtyRect: false,
+      width: 'auto',
+      height: 'auto'
+    })
+    
+    // 确保图表适应容器大小
+    window.addEventListener('resize', () => chartInstance.value && chartInstance.value.resize())
+    chartInstance.value.resize()
     
     // 准备数据
     const timeData = []
@@ -473,8 +482,7 @@ const initChart = () => {
             },
             toolbox: {
               feature: {
-                saveAsImage: { title: '保存为图片' },
-                restore: { title: '还原' }
+                saveAsImage: { title: '保存为图片' }
               }
             },
             dataZoom: [
@@ -518,6 +526,27 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize)
   destroyChart()
 })
+
+// 处理标签页切换
+const handleTabClick = (tab) => {
+  if (tab.props.label === '图表视图') {
+    // 在切换到图表视图时，确保图表正确渲染
+    nextTick(() => {
+      // 延迟一点执行，确保DOM已完全渲染
+      setTimeout(() => {
+        if (chartInstance.value) {
+          // 先调整大小
+          chartInstance.value.resize()
+          // 为确保完全正确的显示，重新初始化图表
+          destroyChart()
+          initChart()
+        } else {
+          initChart()
+        }
+      }, 100)
+    })
+  }
+}
 </script>
 
 <style scoped>
