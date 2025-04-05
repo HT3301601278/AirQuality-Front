@@ -31,7 +31,16 @@
               :shortcuts="dateShortcuts"
               :disabledDate="disabledDate"
               style="width: 350px"
-            />
+            >
+              <template #range-separator>
+                <el-icon><ArrowRight /></el-icon>
+              </template>
+              <template #default="{ visible }">
+                <div v-if="visible" class="el-picker-panel__footer">
+                  <span class="el-picker-panel__footer-note">注：最长可选择30天时间范围</span>
+                </div>
+              </template>
+            </el-date-picker>
           </el-form-item>
           <el-form-item>
             <el-button type="primary" @click="queryData" :disabled="!queryForm.city || !queryForm.dateRange">查询</el-button>
@@ -118,6 +127,7 @@ import { ref, reactive, onMounted, nextTick, watch, onUnmounted } from 'vue'
 import axios from 'axios'
 import * as echarts from 'echarts'
 import 'dayjs/locale/zh-cn'
+import { ArrowRight } from '@element-plus/icons-vue'
 
 export default {
   name: 'History',
@@ -169,7 +179,29 @@ export default {
 
     const disabledDate = (time) => {
       // 限制最早日期为2020年12月31日，最晚日期为当前日期
-      return time.getTime() > Date.now() || time.getTime() < new Date('2020-12-31').getTime()
+      if (time.getTime() > Date.now() || time.getTime() < new Date('2020-12-31').getTime()) {
+        return true
+      }
+      
+      // 如果已经选择了开始时间，则限制结束时间不能超过开始时间30天
+      if (queryForm.dateRange && queryForm.dateRange[0]) {
+        const startTime = new Date(queryForm.dateRange[0])
+        const endTime = new Date(startTime.getTime() + 30 * 24 * 60 * 60 * 1000)
+        if (time.getTime() > endTime.getTime()) {
+          return true
+        }
+      }
+      
+      // 如果已经选择了结束时间，则限制开始时间不能早于结束时间30天
+      if (queryForm.dateRange && queryForm.dateRange[1]) {
+        const endTime = new Date(queryForm.dateRange[1])
+        const startTime = new Date(endTime.getTime() - 30 * 24 * 60 * 60 * 1000)
+        if (time.getTime() < startTime.getTime()) {
+          return true
+        }
+      }
+      
+      return false
     }
 
     const getProvinces = async () => {
@@ -605,7 +637,8 @@ export default {
       dateShortcuts,
       disabledDate,
       getAQIStyle,
-      getAQILevelType
+      getAQILevelType,
+      ArrowRight
     }
   }
 }
@@ -664,5 +697,11 @@ export default {
 
 .loading-container {
   padding: 40px;
+}
+
+.el-picker-panel__footer-note {
+  color: #909399;
+  font-size: 12px;
+  padding: 0 12px;
 }
 </style> 
