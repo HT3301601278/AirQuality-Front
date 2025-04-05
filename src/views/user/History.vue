@@ -227,9 +227,12 @@ export default {
 
         if (response.data.code === 200) {
           historyData.value = response.data.data
-          nextTick(() => {
-            initCharts()
-          })
+          // 如果当前在详细趋势标签页，则初始化图表
+          if (activeTab.value === 'details') {
+            nextTick(() => {
+              initCharts()
+            })
+          }
         }
       } catch (error) {
         console.error('获取历史数据失败:', error)
@@ -518,11 +521,22 @@ export default {
       })
     }
 
+    // 监听activeTab变化，切换到详细趋势时初始化图表
+    watch(activeTab, (newValue) => {
+      if (newValue === 'details' && historyData.value.length > 0) {
+        nextTick(() => {
+          initCharts()
+        })
+      }
+    })
+
     // 监听activeChart变化，确保图表渲染
     watch(activeChart, () => {
-      nextTick(() => {
-        handleResize()
-      })
+      if (activeTab.value === 'details' && historyData.value.length > 0) {
+        nextTick(() => {
+          handleResize()
+        })
+      }
     })
 
     const getAQIStyle = (aqi) => {
