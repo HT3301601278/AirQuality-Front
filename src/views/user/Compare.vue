@@ -152,10 +152,10 @@
 
         <el-tabs v-model="activeChartTab" @tab-click="handleChartTabChange">
           <el-tab-pane label="柱状图" name="bar">
-            <div ref="barChart" class="chart-container"></div>
+            <div ref="barChart" class="chart-container" v-show="activeChartTab === 'bar'"></div>
           </el-tab-pane>
           <el-tab-pane label="雷达图" name="radar">
-            <div ref="radarChart" class="chart-container"></div>
+            <div ref="radarChart" class="chart-container" v-show="activeChartTab === 'radar'"></div>
           </el-tab-pane>
           <el-tab-pane label="折线图" name="line">
             <div class="line-chart-controls">
@@ -185,7 +185,7 @@
                 </el-select>
               </div>
             </div>
-            <div ref="lineChart" class="chart-container"></div>
+            <div ref="lineChart" class="chart-container" v-show="activeChartTab === 'line'"></div>
           </el-tab-pane>
         </el-tabs>
 
@@ -502,7 +502,18 @@ export default {
 
     const handleChartTabChange = () => {
       nextTick(() => {
-        updateCharts()
+        setTimeout(() => {
+          if (activeChartTab.value === 'bar' && barChartInstance) {
+            barChartInstance.resize();
+            updateBarChart();
+          } else if (activeChartTab.value === 'radar' && radarChartInstance) {
+            radarChartInstance.resize();
+            updateRadarChart();
+          } else if (activeChartTab.value === 'line' && lineChartInstance) {
+            lineChartInstance.resize();
+            updateLineChart();
+          }
+        }, 50);
       })
     }
     
@@ -693,9 +704,14 @@ export default {
     const updateLineChart = () => {
       if (!lineChartInstance) return
       
+      // 完全重置图表选项，确保数据完全刷新
+      lineChartInstance.clear();
+      
       const sortedData = {}
       comparisonData.value.forEach((city, index) => {
-        if (!selectedCities.value[index].visible) return
+        // 找到对应的城市配置对象
+        const cityObj = selectedCities.value.find(c => c.cityId === city.cityId);
+        if (!cityObj || !cityObj.visible) return;
         
         sortedData[city.cityId] = {}
         city.data.forEach(item => {
@@ -718,11 +734,11 @@ export default {
       
       const series = []
       
-      selectedCities.value.forEach((cityObj, index) => {
-        if (!cityObj.cityId || !cityObj.visible) return
-        
-        const city = comparisonData.value.find(c => c.cityId === cityObj.cityId)
-        if (!city) return
+      // 只处理设置为可见的城市
+      comparisonData.value.forEach((city, index) => {
+        // 找到对应的城市配置对象
+        const cityObj = selectedCities.value.find(c => c.cityId === city.cityId);
+        if (!cityObj || !cityObj.visible) return;
         
         const data = timeArray.map(time => {
           const item = sortedData[city.cityId][time]
