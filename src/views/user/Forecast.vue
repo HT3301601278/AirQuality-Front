@@ -114,7 +114,7 @@
                 </el-checkbox-group>
               </div>
                 
-              <div id="airQualityChart" style="width: 100%; height: 500px;"></div>
+              <div id="airQualityChart" style="width: 100%; height: 450px;"></div>
             </div>
           </el-tab-pane>
         </el-tabs>
@@ -414,7 +414,7 @@ const initChart = () => {
       grid: {
         left: '3%',
         right: '4%',
-        bottom: '13%',
+        bottom: '5%',
         containLabel: true
       },
       xAxis: {
@@ -474,25 +474,10 @@ const initChart = () => {
             toolbox: {
               feature: {
                 saveAsImage: { title: '保存为图片' },
-                dataZoom: {
-                  yAxisIndex: 'none',
-                  title: {
-                    zoom: '区域缩放',
-                    back: '还原缩放'
-                  }
-                },
                 restore: { title: '还原' }
               }
             },
             dataZoom: [
-              {
-                type: 'slider',
-                show: true,
-                xAxisIndex: [0],
-                start: 0,
-                end: 100,
-                bottom: 10
-              },
               {
                 type: 'inside',
                 xAxisIndex: [0],
@@ -583,7 +568,7 @@ onBeforeUnmount(() => {
 
 .chart-container {
   width: 100%;
-  height: 600px;
+  height: 550px;
   padding: 10px;
   display: flex;
   flex-direction: column;
