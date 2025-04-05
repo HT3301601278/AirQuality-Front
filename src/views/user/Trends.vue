@@ -905,6 +905,7 @@ export default {
     }, 300);
 
     let resizeTimer = null
+    let refreshTimer = null  // 添加refreshTimer变量声明
 
     // 监听图表类型和指标变化
     watch(chartType, () => {
