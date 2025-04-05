@@ -890,19 +890,27 @@ export default {
     const handleResize = throttle(() => {
       if (!trendsData.value || trendsData.value.length === 0) return
       
-      try {
-        // 只对当前活动图表进行resize
-        if (activeMetric.value === 'aqi' && aqiChartInstance) {
-          aqiChartInstance.resize({ animation: { duration: 0 } });
-        } else if (activeMetric.value === 'pm' && pmChartInstance) {
-          pmChartInstance.resize({ animation: { duration: 0 } });
-        } else if (activeMetric.value === 'gases' && gasesChartInstance) {
-          gasesChartInstance.resize({ animation: { duration: 0 } });
-        }
-      } catch (e) {
-        console.error('Resize图表失败', e);
+      // 使用 requestAnimationFrame 来优化 resize 处理
+      if (resizeTimer) {
+        cancelAnimationFrame(resizeTimer)
       }
-    }, 300);
+      
+      resizeTimer = requestAnimationFrame(() => {
+        try {
+          // 只对当前活动图表进行resize
+          if (activeMetric.value === 'aqi' && aqiChartInstance) {
+            aqiChartInstance.resize({ animation: false });
+          } else if (activeMetric.value === 'pm' && pmChartInstance) {
+            pmChartInstance.resize({ animation: false });
+          } else if (activeMetric.value === 'gases' && gasesChartInstance) {
+            gasesChartInstance.resize({ animation: false });
+          }
+        } catch (e) {
+          console.error('Resize图表失败', e);
+        }
+        resizeTimer = null
+      })
+    }, 100); // 降低节流时间
 
     let resizeTimer = null
     let refreshTimer = null  // 添加refreshTimer变量声明
@@ -970,9 +978,13 @@ export default {
     onUnmounted(() => {
       destroyCharts()
       window.removeEventListener('resize', handleResize)
-      // 清除所有定时器
-      if (resizeTimer) clearTimeout(resizeTimer)
-      if (refreshTimer) clearTimeout(refreshTimer)
+      // 清除所有定时器和动画帧
+      if (resizeTimer) {
+        cancelAnimationFrame(resizeTimer)
+      }
+      if (refreshTimer) {
+        clearTimeout(refreshTimer)
+      }
     })
 
     return {
