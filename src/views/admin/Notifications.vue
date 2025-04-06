@@ -79,13 +79,13 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="message" label="通知内容" min-width="300" show-overflow-tooltip />
+        <el-table-column prop="message" label="通知内容" min-width="350" show-overflow-tooltip />
         <el-table-column label="地区信息" width="150">
           <template #default="scope">
             <div>{{ scope.row.locationProvince }} - {{ scope.row.locationCity }}</div>
           </template>
         </el-table-column>
-        <el-table-column label="阈值信息" width="200">
+        <el-table-column label="阈值信息" width="120">
           <template #default="scope">
             <div>
               <div><strong>类型:</strong> {{ getThresholdTypeName(scope.row.thresholdType) }}</div>
@@ -94,7 +94,7 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="状态" width="100">
+        <el-table-column label="状态" width="110" align="center">
           <template #default="scope">
             <el-tag :type="scope.row.isRead ? 'info' : 'danger'">
               {{ scope.row.isRead ? '已读' : '未读' }}
@@ -106,40 +106,7 @@
             {{ formatDateTime(scope.row.createdAt) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="120" fixed="right">
-          <template #default="scope">
-            <el-button
-              v-if="!scope.row.isRead"
-              size="small"
-              type="primary"
-              @click="markAsRead(scope.row)"
-              :disabled="markingRead"
-            >
-              标为已读
-            </el-button>
-            <el-button
-              size="small"
-              type="danger"
-              @click="showDeleteConfirm(scope.row)"
-              :disabled="deleting"
-            >
-              删除
-            </el-button>
-          </template>
-        </el-table-column>
       </el-table>
-
-      <div class="pagination-container">
-        <el-pagination
-          v-model:current-page="currentPage"
-          v-model:page-size="pageSize"
-          :page-sizes="[10, 20, 50, 100]"
-          layout="total, sizes, prev, pager, next, jumper"
-          :total="filteredNotifications.length"
-          @size-change="handleSizeChange"
-          @current-change="handleCurrentChange"
-        />
-      </div>
     </el-card>
   </div>
 </template>
@@ -158,13 +125,9 @@ export default {
   setup() {
     const notifications = ref([])
     const loading = ref(false)
-    const markingRead = ref(false)
-    const deleting = ref(false)
     const searchQuery = ref('')
     const readStatusFilter = ref('')
     const thresholdTypeFilter = ref('')
-    const currentPage = ref(1)
-    const pageSize = ref(10)
     const sortColumn = ref('createdAt')
     const sortOrder = ref('descending')
 
@@ -187,60 +150,6 @@ export default {
 
     const refreshNotifications = () => {
       fetchNotifications()
-    }
-
-    const markAsRead = async (notification) => {
-      if (notification.isRead) return
-      
-      markingRead.value = true
-      try {
-        await axios.put(`/api/notifications/${notification.id}/read`)
-        notification.isRead = true
-        ElMessage.success('已将通知标记为已读')
-      } catch (error) {
-        console.error('标记通知为已读失败:', error)
-        ElMessage.error('标记通知为已读失败: ' + error.message)
-      } finally {
-        markingRead.value = false
-      }
-    }
-
-    const showDeleteConfirm = (notification) => {
-      ElMessageBox.confirm(
-        '确定要删除这条通知吗？此操作不可恢复。',
-        '警告',
-        {
-          confirmButtonText: '确定',
-          cancelButtonText: '取消',
-          type: 'warning'
-        }
-      )
-        .then(() => {
-          // 这里假设有删除通知的API，如果没有可以省略此功能
-          deleteNotification(notification)
-        })
-        .catch(() => {
-          // 用户取消删除
-        })
-    }
-
-    const deleteNotification = async (notification) => {
-      deleting.value = true
-      try {
-        // 注：API文档中没有提供删除通知的接口，此处为示例
-        // await axios.delete(`/api/admin/notifications/${notification.id}`)
-        // 由于没有API，这里只是从本地数组中移除
-        const index = notifications.value.findIndex(n => n.id === notification.id)
-        if (index !== -1) {
-          notifications.value.splice(index, 1)
-          ElMessage.success('通知已删除')
-        }
-      } catch (error) {
-        console.error('删除通知失败:', error)
-        ElMessage.error('删除通知失败: ' + error.message)
-      } finally {
-        deleting.value = false
-      }
     }
 
     const filteredNotifications = computed(() => {
@@ -292,20 +201,6 @@ export default {
 
       return result
     })
-
-    const paginatedNotifications = computed(() => {
-      const startIndex = (currentPage.value - 1) * pageSize.value
-      return filteredNotifications.value.slice(startIndex, startIndex + pageSize.value)
-    })
-
-    const handleSizeChange = (val) => {
-      pageSize.value = val
-      currentPage.value = 1
-    }
-
-    const handleCurrentChange = (val) => {
-      currentPage.value = val
-    }
 
     const handleSearchClear = () => {
       searchQuery.value = ''
@@ -365,25 +260,16 @@ export default {
     return {
       notifications,
       filteredNotifications,
-      paginatedNotifications,
       loading,
-      markingRead,
-      deleting,
       searchQuery,
       readStatusFilter,
       thresholdTypeFilter,
-      currentPage,
-      pageSize,
       sortColumn,
       sortOrder,
       totalNotifications,
       unreadNotifications,
       readNotifications,
       refreshNotifications,
-      markAsRead,
-      showDeleteConfirm,
-      handleSizeChange,
-      handleCurrentChange,
       handleSearchClear,
       handleSortChange,
       formatDateTime,
@@ -458,10 +344,14 @@ export default {
   width: 120px;
 }
 
-.pagination-container {
-  margin-top: 20px;
+.action-buttons {
   display: flex;
-  justify-content: flex-end;
+  gap: 5px;
+  justify-content: space-between;
+}
+
+.single-button {
+  justify-content: center;
 }
 
 @media (max-width: 768px) {

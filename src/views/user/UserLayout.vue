@@ -13,11 +13,6 @@
           text-color="#bfcbd9"
           active-text-color="#409EFF"
         >
-          <el-menu-item index="/user/dashboard">
-            <el-icon><Odometer /></el-icon>
-            <template #title>仪表盘</template>
-          </el-menu-item>
-          
           <el-menu-item index="/user/map">
             <el-icon><MapLocation /></el-icon>
             <template #title>空气质量地图</template>
@@ -34,7 +29,7 @@
             <el-menu-item index="/user/trends">近期趋势分析</el-menu-item>
             <el-menu-item index="/user/compare">城市数据对比</el-menu-item>
           </el-sub-menu>
-          
+
           <el-sub-menu index="subscription">
             <template #title>
               <el-icon><Bell /></el-icon>
@@ -45,7 +40,7 @@
           </el-sub-menu>
         </el-menu>
       </el-aside>
-      
+
       <el-container class="main-container">
         <el-header height="60px" class="app-header">
           <div class="header-left">
@@ -70,7 +65,7 @@
             </el-dropdown>
           </div>
         </el-header>
-        
+
         <el-main class="app-main">
           <router-view />
         </el-main>
@@ -100,13 +95,13 @@ export default {
   setup() {
     const store = useStore()
     const router = useRouter()
-    
+
     // 获取用户名
     const username = computed(() => store.state.user.username)
-    
+
     // 获取用户头像
     const userAvatar = computed(() => store.state.user.avatar)
-    
+
     // 退出登录
     const handleLogout = () => {
       ElMessageBox.confirm('确定要退出登录吗?', '提示', {
@@ -118,7 +113,7 @@ export default {
         router.push('/login')
       }).catch(() => {})
     }
-    
+
     return {
       username,
       userAvatar,
@@ -207,4 +202,4 @@ export default {
   background-color: #f0f2f5;
   min-height: calc(100vh - 60px);
 }
-</style> 
+</style>

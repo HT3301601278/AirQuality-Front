@@ -27,12 +27,6 @@ const routes = [
     meta: { requiresAuth: true, userType: 0 },
     children: [
       {
-        path: 'dashboard',
-        name: 'userDashboard',
-        component: () => import('../views/user/Dashboard.vue'),
-        meta: { title: '仪表盘' }
-      },
-      {
         path: 'realtime',
         name: 'realtime',
         component: () => import('../views/user/Realtime.vue'),
@@ -89,12 +83,6 @@ const routes = [
     meta: { requiresAuth: true, userType: 1 },
     children: [
       {
-        path: 'dashboard',
-        name: 'adminDashboard',
-        component: () => import('../views/admin/Dashboard.vue'),
-        meta: { title: '管理员仪表盘' }
-      },
-      {
         path: 'users',
         name: 'users',
         component: () => import('../views/admin/Users.vue'),
@@ -136,8 +124,8 @@ router.beforeEach((to, from, next) => {
       const requiredUserType = to.matched.find(record => record.meta.userType !== undefined)?.meta.userType
 
       if (requiredUserType !== undefined && requiredUserType !== userType) {
-        // 用户类型不匹配，重定向到相应的仪表盘
-        next(userType === 1 ? '/admin/dashboard' : '/user/dashboard')
+        // 用户类型不匹配，重定向到相应的页面
+        next(userType === 1 ? '/admin/users' : '/user/realtime')
       } else {
         next() // 继续访问
       }
@@ -145,8 +133,8 @@ router.beforeEach((to, from, next) => {
   } else {
     // 不需要认证的路由
     if (isAuthenticated && to.path === '/login') {
-      // 已登录用户访问登录页，重定向到对应的仪表盘
-      next(userType === 1 ? '/admin/dashboard' : '/user/dashboard')
+      // 已登录用户访问登录页，重定向到对应的页面
+      next(userType === 1 ? '/admin/users' : '/user/realtime')
     } else {
       next() // 继续访问
     }

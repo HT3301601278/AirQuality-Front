@@ -13,33 +13,23 @@
           text-color="#bfcbd9"
           active-text-color="#409EFF"
         >
-          <el-menu-item index="/admin/dashboard">
-            <el-icon><Odometer /></el-icon>
-            <template #title>仪表盘</template>
-          </el-menu-item>
-          
           <el-menu-item index="/admin/users">
             <el-icon><User /></el-icon>
             <template #title>用户管理</template>
           </el-menu-item>
-          
+
           <el-menu-item index="/admin/locations">
             <el-icon><Location /></el-icon>
             <template #title>位置管理</template>
           </el-menu-item>
-          
-          <el-menu-item index="/admin/alerts">
-            <el-icon><Warning /></el-icon>
-            <template #title>警报管理</template>
-          </el-menu-item>
-          
+
           <el-menu-item index="/admin/notifications">
             <el-icon><Bell /></el-icon>
             <template #title>通知管理</template>
           </el-menu-item>
         </el-menu>
       </el-aside>
-      
+
       <el-container class="main-container">
         <el-header height="60px" class="app-header">
           <div class="header-left">
@@ -64,7 +54,7 @@
             </el-dropdown>
           </div>
         </el-header>
-        
+
         <el-main class="app-main">
           <router-view />
         </el-main>
@@ -94,13 +84,13 @@ export default {
   setup() {
     const store = useStore()
     const router = useRouter()
-    
+
     // 获取用户名
     const username = computed(() => store.state.user.username)
-    
+
     // 获取用户头像
     const userAvatar = computed(() => store.state.user.avatar)
-    
+
     // 退出登录
     const handleLogout = () => {
       ElMessageBox.confirm('确定要退出登录吗?', '提示', {
@@ -112,7 +102,7 @@ export default {
         router.push('/login')
       }).catch(() => {})
     }
-    
+
     return {
       username,
       userAvatar,
@@ -201,4 +191,4 @@ export default {
   background-color: #f0f2f5;
   min-height: calc(100vh - 60px);
 }
-</style> 
+</style>
