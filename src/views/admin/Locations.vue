@@ -1,496 +1,426 @@
 <template>
   <div class="locations-container">
-    <!-- 顶部统计卡片 -->
-    <el-row :gutter="20" class="dashboard-stats">
-      <el-col :span="8">
-        <el-card shadow="hover" class="stat-card">
-          <div class="stat-icon"><el-icon><Location /></el-icon></div>
-          <div class="stat-content">
-            <div class="stat-value">{{ totalLocations }}</div>
-            <div class="stat-label">总位置数</div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :span="8">
-        <el-card shadow="hover" class="stat-card">
-          <div class="stat-icon"><el-icon><MapLocation /></el-icon></div>
-          <div class="stat-content">
-            <div class="stat-value">{{ provinceCount }}</div>
-            <div class="stat-label">覆盖省份</div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :span="8">
-        <el-card shadow="hover" class="stat-card">
-          <div class="stat-icon"><el-icon><Bell /></el-icon></div>
-          <div class="stat-content">
-            <div class="stat-value">{{ cityCount }}</div>
-            <div class="stat-label">覆盖城市</div>
-          </div>
-        </el-card>
-      </el-col>
-    </el-row>
-
-    <!-- 位置管理主卡片 -->
-    <el-card class="main-card">
+    <el-card class="locations-card" :body-style="{ padding: '0px' }">
       <template #header>
         <div class="card-header">
-          <span>位置管理</span>
-          <div class="header-actions">
-            <el-input
-              v-model="searchKeyword"
-              placeholder="搜索省份/城市"
-              class="search-input"
-              clearable
-              @input="handleSearch"
-            >
-              <template #prefix>
-                <el-icon><Search /></el-icon>
-              </template>
-            </el-input>
-            <el-button type="primary" @click="showAddDialog">
-              <el-icon><Plus /></el-icon>
-              添加位置
-            </el-button>
-            <el-button type="primary" @click="fetchLocations">
-              <el-icon><Refresh /></el-icon>
-              刷新
-            </el-button>
+          <div class="header-title">
+            <i class="el-icon-location-information" />
+            <span>位置管理</span>
           </div>
+          <el-button type="primary" @click="handleAdd" icon="plus" round>添加位置</el-button>
         </div>
       </template>
-
-      <!-- 位置列表 -->
-      <el-table
-        v-loading="loading"
-        :data="filteredLocations"
-        stripe
-        border
-        style="width: 100%"
-        class="location-table"
-      >
-        <el-table-column prop="id" label="ID" width="80" sortable />
-        <el-table-column prop="province" label="省份" width="120" sortable />
-        <el-table-column prop="city" label="城市" width="120" sortable />
-        <el-table-column prop="longitude" label="经度" width="120" />
-        <el-table-column prop="latitude" label="纬度" width="120" />
-        <el-table-column label="地图预览" width="200">
-          <template #default="scope">
-            <div class="map-preview" @click="showMap(scope.row)">
-              <el-image 
-                :src="getMapPreviewUrl(scope.row)" 
-                fit="cover"
-                class="preview-image">
-                <template #error>
-                  <div class="map-preview-placeholder">
-                    <el-icon><Picture /></el-icon>
-                    地图预览
-                  </div>
-                </template>
-              </el-image>
-            </div>
-          </template>
-        </el-table-column>
-        <el-table-column prop="subscriptionCount" label="关联订阅数" width="120" sortable>
-          <template #default="scope">
-            <el-tag type="info">{{ scope.row.subscriptionCount || 0 }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
-          <template #default="scope">
-            <el-button
-              size="small"
-              type="primary"
-              @click="showEditDialog(scope.row)"
-              plain
-            >
-              编辑
-            </el-button>
-            <el-popconfirm
-              title="确定删除此位置信息吗?"
-              @confirm="handleDelete(scope.row)"
-            >
-              <template #reference>
-                <el-button 
-                  size="small" 
-                  type="danger" 
-                  plain
-                  :disabled="scope.row.subscriptionCount && scope.row.subscriptionCount > 0"
-                >
-                  删除
-                </el-button>
-              </template>
-            </el-popconfirm>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <!-- 分页控件 -->
-      <div class="pagination-container">
-        <el-pagination
-          v-model:current-page="currentPage"
-          v-model:page-size="pageSize"
-          :page-sizes="[10, 20, 50, 100]"
-          :total="totalLocations"
-          layout="total, sizes, prev, pager, next, jumper"
-          @size-change="handleSizeChange"
-          @current-change="handleCurrentChange"
-        />
+      
+      <!-- 搜索区域 -->
+      <div class="search-container">
+        <el-form :inline="true" :model="searchForm" size="default">
+          <el-form-item label="省份">
+            <el-select v-model="searchForm.province" placeholder="选择省份" clearable @change="handleProvinceChange" class="search-select">
+              <el-option v-for="item in provinces" :key="item" :label="item" :value="item" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="城市">
+            <el-select v-model="searchForm.city" placeholder="选择城市" clearable :disabled="!searchForm.province" class="search-select">
+              <el-option v-for="item in cities" :key="item.id" :label="item.city" :value="item.city" />
+            </el-select>
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" @click="handleSearch" icon="search" class="text-center-btn">搜索</el-button>
+            <el-button @click="resetSearch" icon="refresh" class="text-center-btn">重置</el-button>
+          </el-form-item>
+        </el-form>
       </div>
-    </el-card>
-
-    <!-- 添加/编辑位置对话框 -->
-    <el-dialog
-      v-model="dialogVisible"
-      :title="isEdit ? '编辑位置' : '添加位置'"
-      width="500px"
-      destroy-on-close
-    >
-      <el-form 
-        :model="locationForm" 
-        :rules="rules" 
-        ref="locationFormRef" 
-        label-width="80px"
-        @submit.prevent="submitForm"
-      >
-        <el-form-item label="省份" prop="province">
-          <el-input v-model="locationForm.province" placeholder="请输入省份名称" />
-        </el-form-item>
-        <el-form-item label="城市" prop="city">
-          <el-input v-model="locationForm.city" placeholder="请输入城市名称" />
-        </el-form-item>
-        <el-form-item label="经度" prop="longitude">
-          <el-input-number 
-            v-model="locationForm.longitude" 
-            :precision="6" 
-            :step="0.000001"
-            :min="-180"
-            :max="180"
-            style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item label="纬度" prop="latitude">
-          <el-input-number 
-            v-model="locationForm.latitude" 
-            :precision="6" 
-            :step="0.000001"
-            :min="-90"
-            :max="90"
-            style="width: 100%"
-          />
-        </el-form-item>
-
-        <div class="coordinate-help">
-          <el-alert
-            title="坐标获取帮助"
-            type="info"
-            description="您可以通过高德地图、百度地图等服务获取经纬度坐标。"
-            :closable="false"
-            show-icon
+      
+      <!-- 表格区域 -->
+      <div class="table-container">
+        <el-table
+          v-loading="loading"
+          :data="paginatedLocations"
+          style="width: 100%"
+          border
+          stripe
+          highlight-current-row
+          class="location-table"
+        >
+          <el-table-column type="index" label="序号" width="5%" align="center" />
+          <el-table-column prop="id" label="ID" width="8%" align="center" />
+          <el-table-column prop="province" label="省份" width="15%" align="center" />
+          <el-table-column prop="city" label="城市" width="15%" align="center" />
+          <el-table-column prop="longitude" label="经度" width="20%" align="center" />
+          <el-table-column prop="latitude" label="纬度" width="20%" align="center" />
+          <el-table-column label="操作" width="17%" align="center">
+            <template #default="scope">
+              <div class="action-buttons">
+                <el-button size="small" type="primary" @click="handleEdit(scope.row)" plain icon="edit">编辑</el-button>
+                <el-button size="small" type="danger" @click="handleDelete(scope.row)" plain icon="delete">删除</el-button>
+              </div>
+            </template>
+          </el-table-column>
+        </el-table>
+        
+        <!-- 空状态 -->
+        <el-empty v-if="!loading && filteredLocations.length === 0" description="暂无数据" />
+        
+        <!-- 分页 -->
+        <div class="pagination-container">
+          <el-pagination
+            v-model:current-page="currentPage"
+            v-model:page-size="pageSize"
+            :page-sizes="[10, 20, 50, 100]"
+            layout="total, sizes, prev, pager, next, jumper"
+            :total="filteredLocations.length"
+            @size-change="handleSizeChange"
+            @current-change="handleCurrentChange"
+            background
           />
         </div>
+      </div>
+    </el-card>
+    
+    <!-- 添加/编辑对话框 -->
+    <el-dialog
+      v-model="dialogVisible"
+      :title="dialogType === 'add' ? '添加位置' : '编辑位置'"
+      width="500px"
+      :close-on-click-modal="false"
+      destroy-on-close
+      center
+    >
+      <el-form
+        ref="locationFormRef"
+        :model="locationForm"
+        :rules="locationRules"
+        label-width="80px"
+        :disabled="dialogLoading"
+        class="location-form"
+      >
+        <el-form-item label="省份" prop="province">
+          <el-select
+            v-model="locationForm.province"
+            placeholder="选择省份"
+            style="width: 100%"
+            filterable
+            @change="handleFormProvinceChange"
+          >
+            <el-option v-for="item in provinces" :key="item" :label="item" :value="item" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="城市" prop="city">
+          <el-input v-model="locationForm.city" placeholder="输入城市名称" />
+        </el-form-item>
+        <el-form-item label="经度" prop="longitude">
+          <el-input v-model="locationForm.longitude" placeholder="输入经度，例如：116.407526" />
+        </el-form-item>
+        <el-form-item label="纬度" prop="latitude">
+          <el-input v-model="locationForm.latitude" placeholder="输入纬度，例如：39.904030" />
+        </el-form-item>
       </el-form>
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="submitForm" :loading="submitting">确定</el-button>
+          <el-button type="primary" @click="submitLocationForm" :loading="dialogLoading">
+            确定
+          </el-button>
         </span>
       </template>
-    </el-dialog>
-
-    <!-- 地图查看对话框 -->
-    <el-dialog
-      v-model="mapDialogVisible"
-      title="位置地图"
-      width="800px"
-      destroy-on-close
-    >
-      <div class="map-container" ref="mapContainer">
-        <div v-if="currentLocation" class="location-info-overlay">
-          <div class="location-name">{{ currentLocation.province }} {{ currentLocation.city }}</div>
-          <div class="location-coords">
-            经度: {{ currentLocation.longitude }}，纬度: {{ currentLocation.latitude }}
-          </div>
-        </div>
-        <div class="map-content">
-          <!-- 地图内容将通过 iframe 加载或其他地图组件显示 -->
-          <iframe 
-            v-if="mapUrl" 
-            :src="mapUrl" 
-            frameborder="0" 
-            width="100%" 
-            height="400px"
-            class="map-iframe"
-          ></iframe>
-        </div>
-      </div>
     </el-dialog>
   </div>
 </template>
 
 <script>
 import { ref, reactive, computed, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
 import axios from 'axios'
-import { Location, MapLocation, Bell, Search, Plus, Refresh, Picture } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 export default {
   name: 'Locations',
-  components: {
-    Location,
-    MapLocation,
-    Bell,
-    Search,
-    Plus,
-    Refresh,
-    Picture
-  },
   setup() {
-    // 状态定义
+    // 数据状态
     const loading = ref(false)
-    const submitting = ref(false)
     const locations = ref([])
-    const searchKeyword = ref('')
+    const provinces = ref([])
+    const cities = ref([])
     const currentPage = ref(1)
     const pageSize = ref(10)
-    const totalLocations = ref(0)
+    const searchForm = reactive({
+      province: '',
+      city: ''
+    })
+
+    // 添加/编辑状态
     const dialogVisible = ref(false)
-    const mapDialogVisible = ref(false)
-    const isEdit = ref(false)
-    const currentLocation = ref(null)
-    const mapUrl = ref('')
+    const dialogType = ref('add') // 'add' 或 'edit'
+    const dialogLoading = ref(false)
     const locationFormRef = ref(null)
-    
-    // 表单数据
     const locationForm = reactive({
       id: null,
       province: '',
       city: '',
-      longitude: 0,
-      latitude: 0
+      longitude: '',
+      latitude: ''
     })
-    
-    // 表单验证规则
-    const rules = {
-      province: [
-        { required: true, message: '请输入省份名称', trigger: 'blur' },
-        { min: 2, max: 20, message: '长度在 2 到 20 个字符', trigger: 'blur' }
-      ],
-      city: [
-        { required: true, message: '请输入城市名称', trigger: 'blur' },
-        { min: 2, max: 20, message: '长度在 2 到 20 个字符', trigger: 'blur' }
-      ],
+    const locationRules = {
+      province: [{ required: true, message: '请选择省份', trigger: 'change' }],
+      city: [{ required: true, message: '请输入城市名称', trigger: 'blur' }],
       longitude: [
-        { required: true, message: '请输入经度', trigger: 'blur' }
+        { required: true, message: '请输入经度', trigger: 'blur' },
+        { pattern: /^-?((1[0-7]\d)|([1-9]?\d))(\.\d+)?$/, message: '请输入有效的经度(-180~180)', trigger: 'blur' }
       ],
       latitude: [
-        { required: true, message: '请输入纬度', trigger: 'blur' }
+        { required: true, message: '请输入纬度', trigger: 'blur' },
+        { pattern: /^-?([1-8]?\d(\.\d+)?|90(\.0+)?)$/, message: '请输入有效的纬度(-90~90)', trigger: 'blur' }
       ]
     }
-    
-    // 计算属性
+
+    // 过滤后的位置列表
     const filteredLocations = computed(() => {
-      if (!searchKeyword.value) {
-        return locations.value
-      }
-      const keyword = searchKeyword.value.toLowerCase()
-      return locations.value.filter(item => 
-        item.province.toLowerCase().includes(keyword) || 
-        item.city.toLowerCase().includes(keyword)
-      )
+      return locations.value.filter(item => {
+        const matchProvince = !searchForm.province || item.province === searchForm.province
+        const matchCity = !searchForm.city || item.city === searchForm.city
+        return matchProvince && matchCity
+      })
     })
-    
-    const provinceCount = computed(() => {
-      const provinces = new Set(locations.value.map(item => item.province))
-      return provinces.size
+
+    // 分页后的数据
+    const paginatedLocations = computed(() => {
+      const start = (currentPage.value - 1) * pageSize.value
+      const end = start + pageSize.value
+      return filteredLocations.value.slice(start, end)
     })
-    
-    const cityCount = computed(() => {
-      return locations.value.length
-    })
-    
-    // 方法
+
+    // 加载位置数据
     const fetchLocations = async () => {
       loading.value = true
       try {
-        const response = await axios.get('/api/locations/all')
+        const response = await axios.get('/api/locations/all', {
+          params: {
+            page: 0,
+            size: 1000 // 获取较大数量的位置，前端分页
+          }
+        })
         if (response.data.code === 200) {
-          locations.value = response.data.data
-          totalLocations.value = response.data.data.length
-          
-          // 获取每个位置的订阅数量
-          await fetchSubscriptionCounts()
+          locations.value = response.data.data.content
         } else {
-          ElMessage.error('获取位置数据失败：' + response.data.message)
+          ElMessage.error(response.data.message || '获取位置列表失败')
         }
       } catch (error) {
-        console.error('获取位置数据错误', error)
-        ElMessage.error('获取位置数据出错，请重试')
+        console.error('加载位置数据失败:', error)
+        ElMessage.error('加载位置数据失败，请稍后重试')
       } finally {
         loading.value = false
       }
     }
-    
-    const fetchSubscriptionCounts = async () => {
+
+    // 加载所有省份
+    const fetchProvinces = async () => {
       try {
-        const response = await axios.get('/api/admin/subscriptions')
+        const response = await axios.get('/api/locations/provinces')
         if (response.data.code === 200) {
-          const subscriptions = response.data.data
-          
-          // 计算每个位置关联的订阅数量
-          const locationCounts = {}
-          subscriptions.forEach(sub => {
-            if (sub.location && sub.location.id) {
-              const locationId = sub.location.id
-              locationCounts[locationId] = (locationCounts[locationId] || 0) + 1
-            }
-          })
-          
-          // 更新位置数据
-          locations.value = locations.value.map(location => ({
-            ...location,
-            subscriptionCount: locationCounts[location.id] || 0
-          }))
-        }
-      } catch (error) {
-        console.error('获取订阅数据错误', error)
-      }
-    }
-    
-    const showAddDialog = () => {
-      isEdit.value = false
-      Object.keys(locationForm).forEach(key => {
-        locationForm[key] = key === 'longitude' || key === 'latitude' ? 0 : ''
-      })
-      dialogVisible.value = true
-    }
-    
-    const showEditDialog = (row) => {
-      isEdit.value = true
-      Object.keys(locationForm).forEach(key => {
-        locationForm[key] = row[key]
-      })
-      dialogVisible.value = true
-    }
-    
-    const submitForm = async () => {
-      if (!locationFormRef.value) return
-      
-      await locationFormRef.value.validate(async (valid) => {
-        if (valid) {
-          submitting.value = true
-          try {
-            let response
-            if (isEdit.value) {
-              // 更新位置
-              response = await axios.put(`/api/locations/${locationForm.id}`, {
-                province: locationForm.province,
-                city: locationForm.city,
-                longitude: locationForm.longitude.toString(),
-                latitude: locationForm.latitude.toString()
-              })
-            } else {
-              // 添加位置
-              response = await axios.post('/api/locations', {
-                province: locationForm.province,
-                city: locationForm.city,
-                longitude: locationForm.longitude.toString(),
-                latitude: locationForm.latitude.toString()
-              })
-            }
-            
-            if (response.data.code === 200) {
-              ElMessage.success(isEdit.value ? '位置更新成功' : '位置添加成功')
-              dialogVisible.value = false
-              fetchLocations()
-            } else {
-              ElMessage.error((isEdit.value ? '更新' : '添加') + '位置失败：' + response.data.message)
-            }
-          } catch (error) {
-            console.error((isEdit.value ? '更新' : '添加') + '位置错误', error)
-            ElMessage.error((isEdit.value ? '更新' : '添加') + '位置出错，请重试')
-          } finally {
-            submitting.value = false
-          }
-        }
-      })
-    }
-    
-    const handleDelete = async (row) => {
-      try {
-        const response = await axios.delete(`/api/locations/${row.id}`)
-        if (response.data.code === 200) {
-          ElMessage.success('位置删除成功')
-          fetchLocations()
+          provinces.value = response.data.data
         } else {
-          ElMessage.error('删除位置失败：' + response.data.message)
+          ElMessage.error(response.data.message || '获取省份列表失败')
         }
       } catch (error) {
-        console.error('删除位置错误', error)
-        ElMessage.error('删除位置出错，请重试')
+        console.error('加载省份数据失败:', error)
+        ElMessage.error('加载省份数据失败，请稍后重试')
       }
+    }
+
+    // 根据省份加载城市列表
+    const fetchCities = async (province) => {
+      if (!province) {
+        cities.value = []
+        return
+      }
+      
+      try {
+        const response = await axios.get(`/api/locations/cities?province=${encodeURIComponent(province)}`)
+        if (response.data.code === 200) {
+          cities.value = response.data.data
+        } else {
+          ElMessage.error(response.data.message || '获取城市列表失败')
+        }
+      } catch (error) {
+        console.error('加载城市数据失败:', error)
+        ElMessage.error('加载城市数据失败，请稍后重试')
+      }
+    }
+
+    // 搜索表单相关
+    const handleProvinceChange = (val) => {
+      searchForm.city = ''
+      fetchCities(val)
     }
     
     const handleSearch = () => {
-      // 搜索功能已由计算属性 filteredLocations 实现
+      currentPage.value = 1 // 搜索时重置到第一页
     }
     
-    const handleSizeChange = (size) => {
-      pageSize.value = size
+    const resetSearch = () => {
+      searchForm.province = ''
+      searchForm.city = ''
+      cities.value = []
+      currentPage.value = 1
+    }
+
+    // 分页相关
+    const handleSizeChange = (val) => {
+      pageSize.value = val
     }
     
-    const handleCurrentChange = (page) => {
-      currentPage.value = page
+    const handleCurrentChange = (val) => {
+      currentPage.value = val
+    }
+
+    // 添加/编辑表单相关
+    const handleFormProvinceChange = (val) => {
+      locationForm.city = ''
     }
     
-    const getMapPreviewUrl = (location) => {
-      // 返回地图静态图片URL，这里使用高德地图静态图API作为示例
-      // 实际应用中需要替换为真实的API和密钥
-      return `https://restapi.amap.com/v3/staticmap?location=${location.longitude},${location.latitude}&zoom=14&size=200*100&markers=mid,,A:${location.longitude},${location.latitude}&key=您的高德地图API密钥`
+    const resetLocationForm = () => {
+      if (locationFormRef.value) {
+        locationFormRef.value.resetFields()
+      }
+      locationForm.id = null
+      locationForm.province = ''
+      locationForm.city = ''
+      locationForm.longitude = ''
+      locationForm.latitude = ''
     }
-    
-    const showMap = (location) => {
-      currentLocation.value = location
-      // 构建地图URL，这里使用高德地图作为示例
-      mapUrl.value = `https://uri.amap.com/marker?position=${location.longitude},${location.latitude}&name=${location.province}${location.city}`
-      mapDialogVisible.value = true
+
+    // 添加位置
+    const handleAdd = () => {
+      dialogType.value = 'add'
+      resetLocationForm()
+      dialogVisible.value = true
     }
-    
-    // 生命周期钩子
+
+    // 编辑位置
+    const handleEdit = (row) => {
+      dialogType.value = 'edit'
+      resetLocationForm()
+      
+      // 填充表单数据
+      Object.keys(locationForm).forEach(key => {
+        if (key in row) {
+          locationForm[key] = row[key]
+        }
+      })
+      
+      dialogVisible.value = true
+    }
+
+    // 提交表单
+    const submitLocationForm = () => {
+      locationFormRef.value.validate(async (valid) => {
+        if (!valid) return
+        
+        dialogLoading.value = true
+        try {
+          let response
+          if (dialogType.value === 'add') {
+            // 添加位置
+            response = await axios.post('/api/locations', {
+              province: locationForm.province,
+              city: locationForm.city,
+              longitude: locationForm.longitude,
+              latitude: locationForm.latitude
+            })
+          } else {
+            // 更新位置
+            response = await axios.put(`/api/locations/${locationForm.id}`, {
+              province: locationForm.province,
+              city: locationForm.city,
+              longitude: locationForm.longitude,
+              latitude: locationForm.latitude
+            })
+          }
+          
+          if (response.data.code === 200) {
+            ElMessage.success(dialogType.value === 'add' ? '添加位置成功' : '更新位置成功')
+            dialogVisible.value = false
+            fetchLocations() // 刷新位置列表
+          } else {
+            ElMessage.error(response.data.message || (dialogType.value === 'add' ? '添加位置失败' : '更新位置失败'))
+          }
+        } catch (error) {
+          console.error(dialogType.value === 'add' ? '添加位置失败:' : '更新位置失败:', error)
+          ElMessage.error('网络错误，请稍后重试')
+        } finally {
+          dialogLoading.value = false
+        }
+      })
+    }
+
+    // 删除位置
+    const handleDelete = (row) => {
+      ElMessageBox.confirm(
+        `确定要删除"${row.province}${row.city}"吗？`,
+        '删除确认',
+        {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }
+      ).then(async () => {
+        try {
+          const response = await axios.delete(`/api/locations/${row.id}`)
+          if (response.data.code === 200) {
+            ElMessage.success('删除成功')
+            fetchLocations() // 刷新位置列表
+          } else {
+            ElMessage.error(response.data.message || '删除失败')
+          }
+        } catch (error) {
+          console.error('删除位置失败:', error)
+          ElMessage.error('网络错误，请稍后重试')
+        }
+      }).catch(() => {
+        // 用户取消删除
+      })
+    }
+
+    // 页面加载时获取数据
     onMounted(() => {
       fetchLocations()
+      fetchProvinces()
     })
-    
+
     return {
+      // 数据
       loading,
-      submitting,
       locations,
-      filteredLocations,
-      searchKeyword,
+      provinces,
+      cities,
       currentPage,
       pageSize,
-      totalLocations,
-      dialogVisible,
-      mapDialogVisible,
-      isEdit,
-      locationForm,
-      rules,
-      locationFormRef,
-      currentLocation,
-      mapUrl,
-      provinceCount,
-      cityCount,
+      searchForm,
+      filteredLocations,
+      paginatedLocations,
       
-      fetchLocations,
-      showAddDialog,
-      showEditDialog,
-      submitForm,
-      handleDelete,
+      // 搜索相关
+      handleProvinceChange,
       handleSearch,
+      resetSearch,
+      
+      // 分页相关
       handleSizeChange,
       handleCurrentChange,
-      getMapPreviewUrl,
-      showMap
+      
+      // 对话框相关
+      dialogVisible,
+      dialogType,
+      dialogLoading,
+      locationFormRef,
+      locationForm,
+      locationRules,
+      handleFormProvinceChange,
+      
+      // 操作相关
+      handleAdd,
+      handleEdit,
+      submitLocationForm,
+      handleDelete
     }
   }
 }
@@ -501,144 +431,119 @@ export default {
   padding: 20px;
 }
 
-.dashboard-stats {
-  margin-bottom: 20px;
-}
-
-.stat-card {
-  display: flex;
-  align-items: center;
-  height: 100px;
-}
-
-.stat-icon {
-  font-size: 2.5rem;
-  margin-right: 15px;
-  color: #409eff;
-  display: flex;
-  align-items: center;
-  padding: 0 15px;
-}
-
-.stat-content {
-  display: flex;
-  flex-direction: column;
-}
-
-.stat-value {
-  font-size: 1.8rem;
-  font-weight: bold;
-  color: #303133;
-  margin-bottom: 5px;
-}
-
-.stat-label {
-  font-size: 0.9rem;
-  color: #909399;
+.locations-card {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  background-color: #f8f9fa;
+  padding: 15px 20px;
 }
 
-.header-actions {
+.header-title {
   display: flex;
   align-items: center;
-  gap: 10px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
 }
 
-.search-input {
-  width: 250px;
+.header-title i {
+  margin-right: 8px;
+  font-size: 20px;
+  color: #409EFF;
 }
 
-.main-card {
-  margin-bottom: 20px;
+.search-container {
+  padding: 20px;
+  background-color: #fafafa;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.search-select {
+  width: 180px;
+}
+
+.table-container {
+  padding: 0 20px 20px 20px;
 }
 
 .location-table {
-  margin-top: 15px;
+  margin-top: 20px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.location-table :deep(.el-table__header) {
+  width: 100% !important;
+}
+
+.location-table :deep(.el-table__header-wrapper table) {
+  width: 100% !important;
+}
+
+.location-table :deep(.el-table__body) {
+  width: 100% !important;
+}
+
+.location-table :deep(.el-table__body-wrapper table) {
+  width: 100% !important;
+}
+
+.location-table :deep(th) {
+  background-color: #f5f7fa;
+  color: #606266;
+  font-weight: 600;
+}
+
+.action-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 5px;
 }
 
 .pagination-container {
-  margin-top: 20px;
+  margin-top: 30px;
+  display: flex;
+  justify-content: center;
+}
+
+.dialog-footer {
   display: flex;
   justify-content: flex-end;
+  gap: 10px;
 }
 
-.map-preview {
-  width: 100%;
-  height: 60px;
-  cursor: pointer;
-  overflow: hidden;
-  border-radius: 4px;
-  border: 1px solid #ebeef5;
-  transition: all 0.3s;
+.location-form {
+  padding: 10px 20px;
 }
 
-.map-preview:hover {
-  transform: scale(1.02);
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .search-select {
+    width: 150px;
+  }
+  
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  
+  .card-header button {
+    align-self: flex-end;
+  }
 }
 
-.preview-image {
-  width: 100%;
-  height: 100%;
-}
-
-.map-preview-placeholder {
+/* 确保按钮中的文字居中 */
+.text-center-btn {
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100%;
-  color: #909399;
-  font-size: 12px;
-  background-color: #f5f7fa;
-}
-
-.map-preview-placeholder .el-icon {
-  font-size: 20px;
-  margin-bottom: 5px;
-}
-
-.coordinate-help {
-  margin: 10px 0 20px;
-}
-
-.map-container {
-  position: relative;
-  width: 100%;
-  height: 400px;
-  background-color: #f5f7fa;
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.location-info-overlay {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  background-color: rgba(255, 255, 255, 0.8);
-  padding: 10px;
-  border-radius: 4px;
-  z-index: 100;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
-}
-
-.location-name {
-  font-weight: bold;
-  font-size: 16px;
-  margin-bottom: 5px;
-}
-
-.location-coords {
-  font-size: 12px;
-  color: #606266;
-}
-
-.map-iframe {
-  border: none;
 }
 </style> 
