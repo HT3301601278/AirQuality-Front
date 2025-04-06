@@ -349,7 +349,24 @@ export default {
     const loading = ref(false)
     const hasComparisonData = ref(false)
     const showEmptyState = ref(false)
-    const comparisonData = ref([])
+    
+    // 分别存储两种模式的对比数据
+    const historicalComparisonData = ref([])
+    const specificDatesComparisonData = ref([])
+    
+    // 用计算属性获取当前模式的对比数据
+    const comparisonData = computed(() => {
+      return compareType.value === 'historical' ? historicalComparisonData.value : specificDatesComparisonData.value
+    })
+    
+    // 分别存储两种模式是否有对比数据
+    const hasHistoricalData = ref(false)
+    const hasSpecificDatesData = ref(false)
+    
+    // 计算当前模式是否有对比数据
+    const currentHasComparisonData = computed(() => {
+      return compareType.value === 'historical' ? hasHistoricalData.value : hasSpecificDatesData.value
+    })
     
     const activeChartTab = ref('bar')
     const barChart = ref(null)
@@ -476,23 +493,15 @@ export default {
     }
 
     const handleCompareTypeChange = () => {
-      // 重置所有输入
-      if (compareType.value === 'historical') {
-        dateRange.value = []
-        specificDate1.value = ''
-        specificDate2.value = ''
-        singleCity.value = { province: '', cityId: null, cityName: '', cities: [], visible: true, healthRecommendation: '' }
-      } else {
-        dateRange.value = []
-        specificDate1.value = ''
-        specificDate2.value = ''
-        // 保留第一个城市的数据
-        if (selectedCities.value.length > 0 && selectedCities.value[0].cityId) {
-          singleCity.value = { ...selectedCities.value[0] }
-        } else {
-          singleCity.value = { province: '', cityId: null, cityName: '', cities: [], visible: true, healthRecommendation: '' }
+      // 切换模式时不清空数据，只是展示不同的表单和结果
+      // 这里不再进行任何数据清空操作
+      
+      // 更新图表显示
+      nextTick(() => {
+        if (currentHasComparisonData.value) {
+          initCharts()
         }
-      }
+      })
     }
 
     const disabledDate = (time) => {
@@ -504,13 +513,14 @@ export default {
       if (!canCompare.value) return
       
       loading.value = true
-      hasComparisonData.value = false
-      comparisonData.value = []
       
       try {
-        const promises = []
-        
         if (compareType.value === 'historical') {
+          // 清空历史数据对比的结果
+          hasHistoricalData.value = false
+          historicalComparisonData.value = []
+          
+          const promises = []
           const validCities = selectedCities.value.filter(city => city.cityId)
           
           for (const city of validCities) {
@@ -541,10 +551,16 @@ export default {
                 validCities[index].healthRecommendation = result.data.data[0].healthRecommendation
               }
               
-              comparisonData.value.push(cityData)
+              historicalComparisonData.value.push(cityData)
             }
           })
+          
+          hasHistoricalData.value = historicalComparisonData.value.length >= 2
         } else {
+          // 清空特定日期对比的结果
+          hasSpecificDatesData.value = false
+          specificDatesComparisonData.value = []
+          
           // 特定日期对比模式
           if (!singleCity.value.cityId) return
           
@@ -567,7 +583,7 @@ export default {
             
             // 日期1的数据
             if (response.data.data && response.data.data[0] && response.data.data[0].length > 0) {
-              comparisonData.value.push({
+              specificDatesComparisonData.value.push({
                 cityId: singleCity.value.cityId + '-date1',
                 cityName: `${singleCity.value.cityName} (${date1Display})`,
                 data: response.data.data[0]
@@ -578,18 +594,19 @@ export default {
             
             // 日期2的数据
             if (response.data.data && response.data.data[1] && response.data.data[1].length > 0) {
-              comparisonData.value.push({
+              specificDatesComparisonData.value.push({
                 cityId: singleCity.value.cityId + '-date2',
                 cityName: `${singleCity.value.cityName} (${date2Display})`,
                 data: response.data.data[1]
               })
             }
+            
+            hasSpecificDatesData.value = specificDatesComparisonData.value.length >= 2
           }
         }
         
         processTableData()
         
-        hasComparisonData.value = true
         nextTick(() => {
           initCharts()
         })
@@ -693,13 +710,24 @@ export default {
       if (!barChartInstance) return
       
       const series = []
-      const cities = selectedCities.value.filter(city => city.cityId)
+      const cities = compareType.value === 'historical' 
+        ? selectedCities.value.filter(city => city.cityId)
+        : [{ cityId: singleCity.value.cityId + '-date1', cityName: specificDate1.value ? new Date(specificDate1.value).toLocaleDateString('zh-CN') : '日期1' },
+           { cityId: singleCity.value.cityId + '-date2', cityName: specificDate2.value ? new Date(specificDate2.value).toLocaleDateString('zh-CN') : '日期2' }]
       
       selectedMetrics.value.forEach(metric => {
         const metricLabel = availableMetrics.find(m => m.value === metric)?.label || metric
         
         const data = cities.map((city, index) => {
-          const cityData = comparisonData.value.find(d => d.cityId === city.cityId)
+          const cityData = comparisonData.value.find(d => {
+            if (compareType.value === 'historical') {
+              return d.cityId === city.cityId
+            } else {
+              // 单城市多日期对比模式下，匹配虚拟城市ID
+              return d.cityId === singleCity.value.cityId + '-date' + (index + 1)
+            }
+          })
+          
           if (!cityData || !cityData.data || cityData.data.length === 0) return 0
           
           const values = cityData.data.map(item => parseFloat(item[metric]) || 0)
@@ -749,7 +777,16 @@ export default {
         },
         xAxis: {
           type: 'category',
-          data: cities.map(city => city.cityName),
+          data: cities.map(city => {
+            if (compareType.value === 'historical') {
+              return city.cityName
+            } else {
+              // 对于单城市多日期对比，显示日期
+              const index = city.cityId.endsWith('date1') ? 0 : 1
+              const date = index === 0 ? specificDate1.value : specificDate2.value
+              return date ? new Date(date).toLocaleDateString('zh-CN') : `日期${index + 1}`
+            }
+          }),
           axisLabel: {
             interval: 0,
             rotate: 30
@@ -856,10 +893,18 @@ export default {
       lineChartInstance.clear();
       
       // 获取所有可见城市的数据
-      const visibleCities = comparisonData.value.filter(city => {
-        const cityObj = selectedCities.value.find(c => c.cityId === city.cityId);
-        return cityObj && cityObj.visible;
-      });
+      let visibleCities;
+      
+      if (compareType.value === 'historical') {
+        // 多城市时间段对比模式
+        visibleCities = comparisonData.value.filter(city => {
+          const cityObj = selectedCities.value.find(c => c.cityId === city.cityId);
+          return cityObj && cityObj.visible;
+        });
+      } else {
+        // 单城市多日期对比模式
+        visibleCities = comparisonData.value;
+      }
       
       // 收集所有时间点并排序
       const allTimes = new Set();
@@ -898,9 +943,10 @@ export default {
           return item ? (parseFloat(item[lineChartMetric.value]) || 0) : '-'; // 使用'-'而不是null/undefined保持连线
         });
         
-        // 找到对应的城市对象以获取颜色信息
-        const cityIndex = selectedCities.value.findIndex(c => c.cityId === city.cityId);
-        const colorIndex = cityIndex >= 0 ? cityIndex : index;
+        // 找到对应的颜色
+        const colorIndex = compareType.value === 'historical' 
+          ? selectedCities.value.findIndex(c => c.cityId === city.cityId) 
+          : index;
         
         series.push({
           name: city.cityName,
@@ -912,10 +958,10 @@ export default {
           connectNulls: true, // 确保连接空值点
           lineStyle: {
             width: 2,
-            color: cityColors[colorIndex % cityColors.length]
+            color: cityColors[colorIndex >= 0 ? colorIndex : index % cityColors.length]
           },
           itemStyle: {
-            color: cityColors[colorIndex % cityColors.length]
+            color: cityColors[colorIndex >= 0 ? colorIndex : index % cityColors.length]
           }
         });
       });
@@ -968,7 +1014,7 @@ export default {
       specificDate1,
       specificDate2,
       loading,
-      hasComparisonData,
+      hasComparisonData: currentHasComparisonData,
       showEmptyState,
       canCompare,
       
