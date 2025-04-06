@@ -107,12 +107,6 @@ const routes = [
         meta: { title: '位置管理' }
       },
       {
-        path: 'alerts',
-        name: 'adminAlerts',
-        component: () => import('../views/admin/Alerts.vue'),
-        meta: { title: '警报管理' }
-      },
-      {
         path: 'notifications',
         name: 'notifications',
         component: () => import('../views/admin/Notifications.vue'),

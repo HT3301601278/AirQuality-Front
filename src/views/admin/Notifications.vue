@@ -1,308 +1,347 @@
 <template>
   <div class="notifications-container">
-    <el-card>
+    <el-card class="statistics-card">
+      <div class="statistics">
+        <el-row :gutter="20">
+          <el-col :span="8">
+            <div class="stat-item">
+              <div class="stat-title">总通知数</div>
+              <div class="stat-value">{{ totalNotifications }}</div>
+            </div>
+          </el-col>
+          <el-col :span="8">
+            <div class="stat-item">
+              <div class="stat-title">未读通知</div>
+              <div class="stat-value">{{ unreadNotifications }}</div>
+            </div>
+          </el-col>
+          <el-col :span="8">
+            <div class="stat-item">
+              <div class="stat-title">已读通知</div>
+              <div class="stat-value">{{ readNotifications }}</div>
+            </div>
+          </el-col>
+        </el-row>
+      </div>
+    </el-card>
+
+    <el-card class="main-card">
       <template #header>
         <div class="card-header">
-          <span>通知管理</span>
-          <el-button type="primary" size="small" @click="openAddDialog">添加通知</el-button>
+          <span class="title">通知管理</span>
+          <div class="filters">
+            <el-input
+              v-model="searchQuery"
+              placeholder="搜索用户名或地区"
+              clearable
+              class="search-input"
+              @clear="handleSearchClear"
+            >
+              <template #prefix>
+                <el-icon><Search /></el-icon>
+              </template>
+            </el-input>
+            <el-select v-model="readStatusFilter" placeholder="读取状态" class="filter-select">
+              <el-option label="全部" value="" />
+              <el-option label="已读" value="read" />
+              <el-option label="未读" value="unread" />
+            </el-select>
+            <el-select v-model="thresholdTypeFilter" placeholder="阈值类型" class="filter-select">
+              <el-option label="全部" value="" />
+              <el-option label="AQI" value="1" />
+              <el-option label="PM2.5" value="2" />
+            </el-select>
+            <el-button type="primary" @click="refreshNotifications">刷新</el-button>
+          </div>
         </div>
       </template>
-      
-      <!-- 搜索区域 -->
-      <div class="search-container">
-        <el-input
-          v-model="searchKeyword"
-          placeholder="搜索通知标题"
-          class="search-input"
-          clearable
-          @clear="getNotifications"
-        >
-          <template #append>
-            <el-button icon="el-icon-search" @click="getNotifications"></el-button>
-          </template>
-        </el-input>
-        
-        <el-select v-model="statusFilter" placeholder="通知状态" @change="getNotifications" clearable>
-          <el-option label="已发布" :value="1"></el-option>
-          <el-option label="草稿" :value="0"></el-option>
-        </el-select>
-      </div>
 
-      <!-- 通知列表 -->
-      <el-table :data="notificationList" style="width: 100%" v-loading="loading">
-        <el-table-column prop="id" label="ID" width="80"></el-table-column>
-        <el-table-column prop="title" label="标题" show-overflow-tooltip></el-table-column>
-        <el-table-column prop="content" label="内容" show-overflow-tooltip></el-table-column>
-        <el-table-column prop="createTime" label="创建时间" width="160">
+      <el-table
+        v-loading="loading"
+        :data="filteredNotifications"
+        style="width: 100%"
+        stripe
+        border
+        :header-cell-style="{ background: '#f5f7fa', color: '#606266' }"
+      >
+        <el-table-column prop="id" label="ID" width="80" />
+        <el-table-column label="用户信息" width="150">
           <template #default="scope">
-            {{ formatDate(scope.row.createTime) }}
+            <div>
+              <div><strong>ID:</strong> {{ scope.row.user.id }}</div>
+              <div><strong>用户名:</strong> {{ scope.row.user.username }}</div>
+            </div>
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" width="100">
+        <el-table-column prop="message" label="通知内容" min-width="300" show-overflow-tooltip />
+        <el-table-column label="地区信息" width="150">
           <template #default="scope">
-            <el-tag :type="scope.row.status === 1 ? 'success' : 'info'">
-              {{ scope.row.status === 1 ? '已发布' : '草稿' }}
+            <div>{{ scope.row.locationProvince }} - {{ scope.row.locationCity }}</div>
+          </template>
+        </el-table-column>
+        <el-table-column label="阈值信息" width="200">
+          <template #default="scope">
+            <div>
+              <div><strong>类型:</strong> {{ getThresholdTypeName(scope.row.thresholdType) }}</div>
+              <div><strong>阈值:</strong> {{ scope.row.thresholdValue }}</div>
+              <div><strong>实际值:</strong> {{ scope.row.actualValue }}</div>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="100">
+          <template #default="scope">
+            <el-tag :type="scope.row.isRead ? 'info' : 'danger'">
+              {{ scope.row.isRead ? '已读' : '未读' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200">
+        <el-table-column prop="createdAt" label="创建时间" width="180">
           <template #default="scope">
-            <el-button type="primary" size="small" @click="handleEdit(scope.row)">编辑</el-button>
-            <el-button 
-              type="danger" 
-              size="small" 
-              @click="handleDelete(scope.row)"
-            >删除</el-button>
+            {{ formatDateTime(scope.row.createdAt) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="120" fixed="right">
+          <template #default="scope">
+            <el-button
+              v-if="!scope.row.isRead"
+              size="small"
+              type="primary"
+              @click="markAsRead(scope.row)"
+              :disabled="markingRead"
+            >
+              标为已读
+            </el-button>
+            <el-button
+              size="small"
+              type="danger"
+              @click="showDeleteConfirm(scope.row)"
+              :disabled="deleting"
+            >
+              删除
+            </el-button>
           </template>
         </el-table-column>
       </el-table>
-      
-      <!-- 分页 -->
+
       <div class="pagination-container">
         <el-pagination
+          v-model:current-page="currentPage"
+          v-model:page-size="pageSize"
+          :page-sizes="[10, 20, 50, 100]"
+          layout="total, sizes, prev, pager, next, jumper"
+          :total="filteredNotifications.length"
           @size-change="handleSizeChange"
           @current-change="handleCurrentChange"
-          :current-page="currentPage"
-          :page-sizes="[10, 20, 50]"
-          :page-size="pageSize"
-          layout="total, sizes, prev, pager, next, jumper"
-          :total="totalItems">
-        </el-pagination>
+        />
       </div>
     </el-card>
-    
-    <!-- 添加/编辑通知对话框 -->
-    <el-dialog
-      :title="dialogType === 'add' ? '添加通知' : '编辑通知'"
-      v-model="dialogVisible"
-      width="50%"
-    >
-      <el-form :model="notificationForm" :rules="rules" ref="notificationFormRef" label-width="80px">
-        <el-form-item label="标题" prop="title">
-          <el-input v-model="notificationForm.title" placeholder="请输入通知标题"></el-input>
-        </el-form-item>
-        <el-form-item label="内容" prop="content">
-          <el-input 
-            type="textarea" 
-            v-model="notificationForm.content" 
-            placeholder="请输入通知内容"
-            :rows="4"
-          ></el-input>
-        </el-form-item>
-        <el-form-item label="状态">
-          <el-switch
-            v-model="notificationForm.status"
-            :active-value="1"
-            :inactive-value="0"
-            active-text="发布"
-            inactive-text="草稿"
-          ></el-switch>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="submitForm">确认</el-button>
-        </span>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
 <script>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import axios from 'axios'
+import { Search } from '@element-plus/icons-vue'
 
 export default {
   name: 'Notifications',
+  components: {
+    Search
+  },
   setup() {
-    // 数据列表和加载状态
-    const notificationList = ref([])
+    const notifications = ref([])
     const loading = ref(false)
-    const dialogVisible = ref(false)
-    const dialogType = ref('add') // add 或 edit
-    const searchKeyword = ref('')
-    const statusFilter = ref('')
-    
-    // 分页相关
+    const markingRead = ref(false)
+    const deleting = ref(false)
+    const searchQuery = ref('')
+    const readStatusFilter = ref('')
+    const thresholdTypeFilter = ref('')
     const currentPage = ref(1)
     const pageSize = ref(10)
-    const totalItems = ref(0)
-    
-    // 表单相关
-    const notificationFormRef = ref(null)
-    const notificationForm = reactive({
-      id: null,
-      title: '',
-      content: '',
-      status: 1
-    })
-    
-    const rules = {
-      title: [
-        { required: true, message: '请输入通知标题', trigger: 'blur' },
-        { min: 2, max: 50, message: '标题长度在2到50个字符之间', trigger: 'blur' }
-      ],
-      content: [
-        { required: true, message: '请输入通知内容', trigger: 'blur' }
-      ]
-    }
-    
-    // 获取通知列表
-    const getNotifications = async () => {
+
+    const fetchNotifications = async () => {
       loading.value = true
-      
       try {
-        // 假设API为 /api/admin/notifications
-        // const { data } = await fetch(`/api/admin/notifications?page=${currentPage.value}&size=${pageSize.value}&keyword=${searchKeyword.value}&status=${statusFilter.value}`)
-        
-        // 模拟数据，实际项目中替换为真实API调用
-        setTimeout(() => {
-          notificationList.value = Array(10).fill(null).map((_, index) => ({
-            id: index + 1,
-            title: `通知标题 ${index + 1}`,
-            content: `这是通知内容示例，实际中将从API获取数据。这是通知 ${index + 1} 的详细内容。`,
-            createTime: new Date(Date.now() - index * 86400000).toISOString(),
-            status: index % 3 ? 1 : 0
-          }))
-          
-          totalItems.value = 100
-          loading.value = false
-        }, 500)
+        const response = await axios.get('/api/admin/notifications')
+        if (response.data && response.data.code === 200) {
+          notifications.value = response.data.data
+        } else {
+          ElMessage.error('获取通知数据失败')
+        }
       } catch (error) {
-        console.error('获取通知列表失败:', error)
-        ElMessage.error('获取通知列表失败')
+        console.error('获取通知列表错误:', error)
+        ElMessage.error('获取通知数据出错: ' + error.message)
+      } finally {
         loading.value = false
       }
     }
-    
-    // 打开添加对话框
-    const openAddDialog = () => {
-      dialogType.value = 'add'
-      resetForm()
-      dialogVisible.value = true
+
+    const refreshNotifications = () => {
+      fetchNotifications()
     }
-    
-    // 编辑通知
-    const handleEdit = (row) => {
-      dialogType.value = 'edit'
-      notificationForm.id = row.id
-      notificationForm.title = row.title
-      notificationForm.content = row.content
-      notificationForm.status = row.status
-      dialogVisible.value = true
+
+    const markAsRead = async (notification) => {
+      if (notification.isRead) return
+      
+      markingRead.value = true
+      try {
+        await axios.put(`/api/notifications/${notification.id}/read`)
+        notification.isRead = true
+        ElMessage.success('已将通知标记为已读')
+      } catch (error) {
+        console.error('标记通知为已读失败:', error)
+        ElMessage.error('标记通知为已读失败: ' + error.message)
+      } finally {
+        markingRead.value = false
+      }
     }
-    
-    // 删除通知
-    const handleDelete = (row) => {
+
+    const showDeleteConfirm = (notification) => {
       ElMessageBox.confirm(
-        `确定要删除通知 "${row.title}" 吗？`,
-        '删除确认',
+        '确定要删除这条通知吗？此操作不可恢复。',
+        '警告',
         {
           confirmButtonText: '确定',
           cancelButtonText: '取消',
           type: 'warning'
         }
-      ).then(async () => {
-        try {
-          // 假设API为 /api/admin/notifications/{id}
-          // await fetch(`/api/admin/notifications/${row.id}`, { method: 'DELETE' })
-          
-          // 模拟删除成功
-          ElMessage.success('删除成功')
-          getNotifications()
-        } catch (error) {
-          console.error('删除通知失败:', error)
-          ElMessage.error('删除通知失败')
-        }
-      }).catch(() => {
-        // 用户取消删除
-      })
+      )
+        .then(() => {
+          // 这里假设有删除通知的API，如果没有可以省略此功能
+          deleteNotification(notification)
+        })
+        .catch(() => {
+          // 用户取消删除
+        })
     }
-    
-    // 提交表单
-    const submitForm = async () => {
-      if (!notificationFormRef.value) return
-      
-      notificationFormRef.value.validate(async (valid) => {
-        if (valid) {
-          try {
-            const isAdd = dialogType.value === 'add'
-            // const url = isAdd ? '/api/admin/notifications' : `/api/admin/notifications/${notificationForm.id}`
-            // const method = isAdd ? 'POST' : 'PUT'
-            
-            // await fetch(url, {
-            //   method,
-            //   headers: { 'Content-Type': 'application/json' },
-            //   body: JSON.stringify(notificationForm)
-            // })
-            
-            // 模拟添加/编辑成功
-            ElMessage.success(isAdd ? '添加成功' : '更新成功')
-            dialogVisible.value = false
-            getNotifications()
-          } catch (error) {
-            console.error('保存通知失败:', error)
-            ElMessage.error('保存失败')
-          }
+
+    const deleteNotification = async (notification) => {
+      deleting.value = true
+      try {
+        // 注：API文档中没有提供删除通知的接口，此处为示例
+        // await axios.delete(`/api/admin/notifications/${notification.id}`)
+        // 由于没有API，这里只是从本地数组中移除
+        const index = notifications.value.findIndex(n => n.id === notification.id)
+        if (index !== -1) {
+          notifications.value.splice(index, 1)
+          ElMessage.success('通知已删除')
         }
-      })
-    }
-    
-    // 重置表单
-    const resetForm = () => {
-      if (notificationFormRef.value) {
-        notificationFormRef.value.resetFields()
+      } catch (error) {
+        console.error('删除通知失败:', error)
+        ElMessage.error('删除通知失败: ' + error.message)
+      } finally {
+        deleting.value = false
       }
-      notificationForm.id = null
-      notificationForm.title = ''
-      notificationForm.content = ''
-      notificationForm.status = 1
     }
-    
-    // 分页相关
-    const handleSizeChange = (size) => {
-      pageSize.value = size
-      getNotifications()
+
+    const filteredNotifications = computed(() => {
+      let result = [...notifications.value]
+
+      // 搜索过滤
+      if (searchQuery.value) {
+        const query = searchQuery.value.toLowerCase()
+        result = result.filter(
+          notification =>
+            notification.user.username.toLowerCase().includes(query) ||
+            notification.locationProvince.toLowerCase().includes(query) ||
+            notification.locationCity.toLowerCase().includes(query) ||
+            notification.message.toLowerCase().includes(query)
+        )
+      }
+
+      // 状态过滤
+      if (readStatusFilter.value) {
+        const isRead = readStatusFilter.value === 'read'
+        result = result.filter(notification => notification.isRead === isRead)
+      }
+
+      // 阈值类型过滤
+      if (thresholdTypeFilter.value) {
+        result = result.filter(
+          notification => notification.thresholdType.toString() === thresholdTypeFilter.value
+        )
+      }
+
+      return result
+    })
+
+    const paginatedNotifications = computed(() => {
+      const startIndex = (currentPage.value - 1) * pageSize.value
+      return filteredNotifications.value.slice(startIndex, startIndex + pageSize.value)
+    })
+
+    const handleSizeChange = (val) => {
+      pageSize.value = val
+      currentPage.value = 1
     }
-    
-    const handleCurrentChange = (page) => {
-      currentPage.value = page
-      getNotifications()
+
+    const handleCurrentChange = (val) => {
+      currentPage.value = val
     }
-    
-    // 日期格式化
-    const formatDate = (dateString) => {
-      if (!dateString) return '-'
-      const date = new Date(dateString)
-      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+
+    const handleSearchClear = () => {
+      searchQuery.value = ''
     }
+
+    const formatDateTime = (dateTimeStr) => {
+      const date = new Date(dateTimeStr)
+      return date.toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      })
+    }
+
+    const getThresholdTypeName = (type) => {
+      const types = {
+        1: 'AQI',
+        2: 'PM2.5'
+      }
+      return types[type] || `未知(${type})`
+    }
+
+    // 统计信息
+    const totalNotifications = computed(() => notifications.value.length)
     
+    const unreadNotifications = computed(() => 
+      notifications.value.filter(notification => !notification.isRead).length
+    )
+    
+    const readNotifications = computed(() => 
+      notifications.value.filter(notification => notification.isRead).length
+    )
+
     onMounted(() => {
-      getNotifications()
+      fetchNotifications()
     })
 
     return {
-      notificationList,
+      notifications,
+      filteredNotifications,
+      paginatedNotifications,
       loading,
-      dialogVisible,
-      dialogType,
-      searchKeyword,
-      statusFilter,
+      markingRead,
+      deleting,
+      searchQuery,
+      readStatusFilter,
+      thresholdTypeFilter,
       currentPage,
       pageSize,
-      totalItems,
-      notificationFormRef,
-      notificationForm,
-      rules,
-      getNotifications,
-      openAddDialog,
-      handleEdit,
-      handleDelete,
-      submitForm,
+      totalNotifications,
+      unreadNotifications,
+      readNotifications,
+      refreshNotifications,
+      markAsRead,
+      showDeleteConfirm,
       handleSizeChange,
       handleCurrentChange,
-      formatDate
+      handleSearchClear,
+      formatDateTime,
+      getThresholdTypeName
     }
   }
 }
@@ -313,20 +352,64 @@ export default {
   padding: 20px;
 }
 
+.statistics-card {
+  margin-bottom: 20px;
+}
+
+.statistics {
+  padding: 10px;
+}
+
+.stat-item {
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  padding: 15px;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s;
+}
+
+.stat-item:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+}
+
+.stat-title {
+  font-size: 14px;
+  color: #606266;
+  margin-bottom: 10px;
+}
+
+.stat-value {
+  font-size: 28px;
+  font-weight: bold;
+  color: #409EFF;
+}
+
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
 }
 
-.search-container {
-  margin-bottom: 20px;
+.title {
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.filters {
   display: flex;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 .search-input {
-  max-width: 300px;
+  width: 200px;
+}
+
+.filter-select {
+  width: 120px;
 }
 
 .pagination-container {
@@ -335,9 +418,20 @@ export default {
   justify-content: flex-end;
 }
 
-.content {
-  padding: 20px 0;
-  text-align: center;
-  color: #909399;
+@media (max-width: 768px) {
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .filters {
+    margin-top: 10px;
+    width: 100%;
+  }
+  
+  .search-input,
+  .filter-select {
+    width: 100%;
+  }
 }
 </style> 
