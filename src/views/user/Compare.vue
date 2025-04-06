@@ -687,9 +687,20 @@ export default {
       if (radarChartInstance) radarChartInstance.dispose()
       if (lineChartInstance) lineChartInstance.dispose()
       
-      barChartInstance = echarts.init(barChart.value)
-      radarChartInstance = echarts.init(radarChart.value)
-      lineChartInstance = echarts.init(lineChart.value)
+      barChartInstance = echarts.init(barChart.value, null, {
+        renderer: 'canvas',
+        useDirtyRect: false
+      })
+      
+      radarChartInstance = echarts.init(radarChart.value, null, {
+        renderer: 'canvas',
+        useDirtyRect: false
+      })
+      
+      lineChartInstance = echarts.init(lineChart.value, null, {
+        renderer: 'canvas',
+        useDirtyRect: false
+      })
       
       updateCharts()
       
@@ -762,6 +773,12 @@ export default {
           trigger: 'axis',
           axisPointer: {
             type: 'shadow'
+          },
+          confine: false,
+          position: function (pos, params, dom, rect, size) {
+            var obj = {top: 10};
+            obj[['left', 'right'][+(pos[0] < size.viewSize[0] / 2)]] = 30;
+            return obj;
           }
         },
         legend: {
@@ -871,7 +888,13 @@ export default {
       
       const option = {
         tooltip: {
-          trigger: 'item'
+          trigger: 'item',
+          confine: false,
+          position: function (pos, params, dom, rect, size) {
+            var obj = {top: 10};
+            obj[['left', 'right'][+(pos[0] < size.viewSize[0] / 2)]] = 30;
+            return obj;
+          }
         },
         legend: {
           data: comparisonData.value.map(city => city.cityName)
@@ -970,7 +993,13 @@ export default {
       
       const option = {
         tooltip: {
-          trigger: 'axis'
+          trigger: 'axis',
+          confine: false,
+          position: function (pos, params, dom, rect, size) {
+            var obj = {top: 10};
+            obj[['left', 'right'][+(pos[0] < size.viewSize[0] / 2)]] = 30;
+            return obj;
+          }
         },
         legend: {
           data: visibleCities.map(city => city.cityName)
