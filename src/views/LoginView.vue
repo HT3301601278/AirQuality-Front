@@ -134,9 +134,9 @@ export default {
             
             // 根据用户角色跳转到不同页面
             if (user.userType === 1) {
-              router.push('/admin/dashboard')
+              router.push('/admin/users')
             } else {
-              router.push('/user/dashboard')
+              router.push('/user/realtime')
             }
           } else {
             ElMessage.error(response.data.message || '登录失败')

@@ -19,6 +19,10 @@ export default createStore({
       state.user = user
       localStorage.setItem('user', JSON.stringify(user))
     },
+    updateUserInfo(state, userData) {
+      state.user = { ...state.user, ...userData }
+      localStorage.setItem('user', JSON.stringify(state.user))
+    },
     logout(state) {
       state.token = ''
       state.user = {}

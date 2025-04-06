@@ -27,12 +27,6 @@ const routes = [
     meta: { requiresAuth: true, userType: 0 },
     children: [
       {
-        path: 'dashboard',
-        name: 'userDashboard',
-        component: () => import('../views/user/Dashboard.vue'),
-        meta: { title: '仪表盘' }
-      },
-      {
         path: 'realtime',
         name: 'realtime',
         component: () => import('../views/user/Realtime.vue'),
@@ -79,6 +73,12 @@ const routes = [
         name: 'map',
         component: () => import('../views/user/Map.vue'),
         meta: { title: '空气质量地图' }
+      },
+      {
+        path: 'info',
+        name: 'userInfo',
+        component: () => import('../views/user/UserInfo.vue'),
+        meta: { title: '个人信息' }
       }
     ]
   },
@@ -88,12 +88,6 @@ const routes = [
     component: () => import('../views/admin/AdminLayout.vue'),
     meta: { requiresAuth: true, userType: 1 },
     children: [
-      {
-        path: 'dashboard',
-        name: 'adminDashboard',
-        component: () => import('../views/admin/Dashboard.vue'),
-        meta: { title: '管理员仪表盘' }
-      },
       {
         path: 'users',
         name: 'users',
@@ -107,16 +101,16 @@ const routes = [
         meta: { title: '位置管理' }
       },
       {
-        path: 'alerts',
-        name: 'adminAlerts',
-        component: () => import('../views/admin/Alerts.vue'),
-        meta: { title: '警报管理' }
-      },
-      {
         path: 'notifications',
         name: 'notifications',
         component: () => import('../views/admin/Notifications.vue'),
         meta: { title: '通知管理' }
+      },
+      {
+        path: 'info',
+        name: 'adminInfo',
+        component: () => import('../views/admin/UserInfo.vue'),
+        meta: { title: '个人信息' }
       }
     ]
   }
@@ -142,8 +136,8 @@ router.beforeEach((to, from, next) => {
       const requiredUserType = to.matched.find(record => record.meta.userType !== undefined)?.meta.userType
 
       if (requiredUserType !== undefined && requiredUserType !== userType) {
-        // 用户类型不匹配，重定向到相应的仪表盘
-        next(userType === 1 ? '/admin/dashboard' : '/user/dashboard')
+        // 用户类型不匹配，重定向到相应的页面
+        next(userType === 1 ? '/admin/users' : '/user/realtime')
       } else {
         next() // 继续访问
       }
@@ -151,8 +145,8 @@ router.beforeEach((to, from, next) => {
   } else {
     // 不需要认证的路由
     if (isAuthenticated && to.path === '/login') {
-      // 已登录用户访问登录页，重定向到对应的仪表盘
-      next(userType === 1 ? '/admin/dashboard' : '/user/dashboard')
+      // 已登录用户访问登录页，重定向到对应的页面
+      next(userType === 1 ? '/admin/users' : '/user/realtime')
     } else {
       next() // 继续访问
     }

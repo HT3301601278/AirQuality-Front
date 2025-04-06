@@ -133,29 +133,26 @@ export default {
         
         loading.value = true
         try {
-          const response = await axios.post('/api/auth/register', {
-            username: registerForm.username,
-            password: registerForm.password,
-            email: registerForm.email
+          // 创建FormData对象用于提交表单数据
+          const formData = new FormData()
+          formData.append('username', registerForm.username)
+          formData.append('password', registerForm.password)
+          formData.append('email', registerForm.email)
+          
+          // 如果有头像，添加到表单数据中
+          if (avatarFile.value) {
+            formData.append('avatar', avatarFile.value)
+          }
+          
+          // 使用register-form接口直接上传表单和头像
+          const response = await axios.post('/api/auth/register-form', formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data'
+            }
           })
           
           if (response.data.code === 200) {
-            // 如果有上传头像，则保存到localStorage，等登录后再上传
-            if (avatarFile.value) {
-              // 将文件转换为Base64字符串
-              const reader = new FileReader()
-              reader.readAsDataURL(avatarFile.value)
-              reader.onload = () => {
-                // 保存头像文件信息到localStorage
-                localStorage.setItem('pendingAvatar', reader.result)
-                localStorage.setItem('pendingAvatarUsername', registerForm.username)
-                
-                ElMessage.success('注册成功，请登录后上传头像')
-              }
-            } else {
-              ElMessage.success('注册成功，请登录')
-            }
-            
+            ElMessage.success('注册成功，请登录')
             router.push('/login')
           } else {
             ElMessage.error(response.data.message || '注册失败')
