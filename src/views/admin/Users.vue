@@ -1,336 +1,393 @@
 <template>
   <div class="users-container">
-    <!-- 顶部统计卡片 -->
-    <el-row :gutter="20" class="dashboard-stats" v-if="dashboard">
-      <el-col :span="12">
-        <el-card shadow="hover" class="stat-card">
-          <div class="stat-icon"><el-icon><User /></el-icon></div>
-          <div class="stat-content">
-            <div class="stat-value">{{ dashboard.userCount }}</div>
-            <div class="stat-label">用户总数</div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :span="12">
-        <el-card shadow="hover" class="stat-card">
-          <div class="stat-icon"><el-icon><Bell /></el-icon></div>
-          <div class="stat-content">
-            <div class="stat-value">{{ dashboard.subscriptionCount }}</div>
-            <div class="stat-label">订阅总数</div>
-          </div>
-        </el-card>
-      </el-col>
-    </el-row>
-
-    <!-- 用户管理主卡片 -->
-    <el-card class="main-card">
+    <el-card class="main-card" shadow="hover">
       <template #header>
         <div class="card-header">
-          <span>用户管理</span>
-          <div class="header-actions">
+          <div class="left-area">
+            <span class="title">用户管理</span>
+            <el-tag type="info" effect="plain">{{ filteredUsers.length }}位用户</el-tag>
+          </div>
+          <div class="header-operations">
             <el-input
-              v-model="searchKeyword"
-              placeholder="搜索用户名/邮箱"
-              class="search-input"
+              v-model="searchQuery"
+              placeholder="搜索用户名/邮箱..."
+              prefix-icon="Search"
               clearable
+              class="search-input"
               @input="handleSearch"
-            >
-              <template #prefix>
-                <el-icon><Search /></el-icon>
-              </template>
-            </el-input>
-            <el-button type="primary" @click="fetchUsers">
-              <el-icon><Refresh /></el-icon>
-              刷新
-            </el-button>
+            />
+            <div class="filter-buttons">
+              <el-button type="primary" :icon="Refresh" circle @click="refreshData" title="刷新数据"></el-button>
+            </div>
           </div>
         </div>
       </template>
 
-      <!-- 用户列表 -->
+      <!-- 批量操作工具栏 -->
+      <div class="bulk-actions" v-if="selectedUsers.length > 0">
+        <el-alert
+          type="info"
+          :closable="false"
+          show-icon
+        >
+          <template #title>
+            已选择 {{ selectedUsers.length }} 个用户
+          </template>
+          <div class="bulk-actions-buttons">
+            <el-button type="success" size="small" @click="bulkSetStatus(1)">批量启用</el-button>
+            <el-button type="danger" size="small" @click="bulkSetStatus(0)">批量禁用</el-button>
+            <el-button size="small" @click="clearSelection">取消选择</el-button>
+          </div>
+        </el-alert>
+      </div>
+
       <el-table
         v-loading="loading"
-        :data="filteredUsers"
+        :data="pagedUsers"
         stripe
         border
         style="width: 100%"
-        class="user-table"
+        @selection-change="handleSelectionChange"
+        row-key="id"
+        :header-cell-style="{ backgroundColor: '#f5f7fa' }"
       >
+        <el-table-column type="selection" width="55" />
         <el-table-column prop="id" label="ID" width="80" sortable />
-        <el-table-column prop="username" label="用户名" width="150" sortable />
-        <el-table-column prop="email" label="邮箱" width="200" />
+        <el-table-column prop="username" label="用户名" min-width="120" />
+        <el-table-column prop="email" label="邮箱" min-width="200" />
         <el-table-column label="用户类型" width="120">
           <template #default="scope">
-            <el-tag :type="scope.row.userType === 1 ? 'danger' : 'info'">
+            <el-tag :type="scope.row.userType === 1 ? 'danger' : 'primary'" effect="dark">
               {{ scope.row.userType === 1 ? '管理员' : '普通用户' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="状态" width="120">
+        <el-table-column label="状态" width="100">
           <template #default="scope">
             <el-switch
               v-model="scope.row.status"
               :active-value="1"
               :inactive-value="0"
               @change="handleStatusChange(scope.row)"
-              :disabled="scope.row.userType === 1"
+              :active-text="'启用'"
+              :inactive-text="'禁用'"
+              inline-prompt
             />
-            <span class="status-text">{{ scope.row.status === 1 ? '启用' : '禁用' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="createTime" label="注册时间" width="180" sortable>
+        <el-table-column prop="createTime" label="创建时间" min-width="180">
           <template #default="scope">
             {{ formatDate(scope.row.createTime) }}
           </template>
         </el-table-column>
-        <el-table-column prop="lastLoginTime" label="最后登录" width="180" sortable>
+        <el-table-column prop="lastLoginTime" label="最后登录时间" min-width="180">
           <template #default="scope">
             {{ formatDate(scope.row.lastLoginTime) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="180" fixed="right">
+        <el-table-column label="操作" width="120" fixed="right">
           <template #default="scope">
-            <el-button
-              size="small"
-              type="primary"
-              @click="showUserSubscriptions(scope.row)"
-              plain
+            <el-button 
+              type="primary" 
+              size="small" 
+              link
+              :icon="View"
+              @click="viewUserDetails(scope.row)"
             >
-              查看订阅
+              详情
             </el-button>
           </template>
         </el-table-column>
       </el-table>
 
-      <!-- 分页控件 -->
       <div class="pagination-container">
         <el-pagination
           v-model:current-page="currentPage"
           v-model:page-size="pageSize"
-          :page-sizes="[10, 20, 50, 100]"
-          :total="totalUsers"
+          :page-sizes="[10, 30, 50]"
+          :total="filteredUsers.length"
           layout="total, sizes, prev, pager, next, jumper"
           @size-change="handleSizeChange"
           @current-change="handleCurrentChange"
+          background
         />
       </div>
     </el-card>
 
-    <!-- 订阅查看对话框 -->
+    <!-- 用户详情对话框 -->
     <el-dialog
-      v-model="subscriptionDialogVisible"
-      title="用户订阅"
-      width="80%"
+      v-model="dialogVisible"
+      title="用户详情"
+      width="30%"
+      center
+      :modal-append-to-body="false"
       destroy-on-close
+      class="user-detail-dialog"
     >
-      <div class="dialog-header" v-if="currentUser">
-        <span class="user-info">用户: {{ currentUser.username }} ({{ currentUser.email }})</span>
-      </div>
-      <el-table
-        v-loading="subscriptionLoading"
-        :data="userSubscriptions"
-        stripe
-        border
-        style="width: 100%"
-      >
-        <el-table-column prop="id" label="订阅ID" width="80" />
-        <el-table-column label="位置信息" width="200">
-          <template #default="scope">
-            <div class="location-info">
-              <div>{{ scope.row.location.province }} {{ scope.row.location.city }}</div>
-              <div class="location-coords">
-                经度: {{ scope.row.location.longitude }}
-                纬度: {{ scope.row.location.latitude }}
-              </div>
-            </div>
-          </template>
-        </el-table-column>
-        <el-table-column label="监控指标" width="180">
-          <template #default="scope">
-            <el-tag :type="getThresholdTypeTag(scope.row.thresholdType)">
-              {{ getThresholdTypeName(scope.row.thresholdType) }}
-              {{ scope.row.thresholdValue }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="createTime" label="创建时间" width="180">
-          <template #default="scope">
-            {{ formatDate(scope.row.createTime) }}
-          </template>
-        </el-table-column>
-        <el-table-column label="状态" width="120">
-          <template #default="scope">
-            <el-tag :type="scope.row.status === 1 ? 'success' : 'info'">
-              {{ scope.row.status === 1 ? '启用' : '禁用' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="120">
-          <template #default="scope">
-            <el-popconfirm
-              title="确定删除此订阅吗?"
-              @confirm="handleDeleteSubscription(scope.row)"
-            >
-              <template #reference>
-                <el-button size="small" type="danger" plain>删除</el-button>
+      <div v-if="currentUser" class="user-details">
+        <div class="user-avatar">
+          <el-avatar 
+            :size="100" 
+            :src="currentUser.avatar"
+            :fallback="defaultAvatarUrl"
+          ></el-avatar>
+          <h3>{{ currentUser.username }}</h3>
+        </div>
+        
+        <div class="detail-item">
+          <el-descriptions :column="1" border>
+            <el-descriptions-item label="用户ID">{{ currentUser.id }}</el-descriptions-item>
+            <el-descriptions-item label="邮箱">{{ currentUser.email }}</el-descriptions-item>
+            <el-descriptions-item label="用户类型">
+              <el-tag :type="currentUser.userType === 1 ? 'danger' : 'primary'">
+                {{ currentUser.userType === 1 ? '管理员' : '普通用户' }}
+              </el-tag>
+            </el-descriptions-item>
+            <el-descriptions-item label="用户状态">
+              <el-tag :type="currentUser.status === 1 ? 'success' : 'info'">
+                {{ currentUser.status === 1 ? '启用' : '禁用' }}
+              </el-tag>
+            </el-descriptions-item>
+            <el-descriptions-item label="创建时间">{{ formatDate(currentUser.createTime) }}</el-descriptions-item>
+            <el-descriptions-item label="最后登录时间">{{ formatDate(currentUser.lastLoginTime) }}</el-descriptions-item>
+          </el-descriptions>
+          
+          <!-- 用户订阅列表 -->
+          <div class="subscription-section" v-if="currentUser.subscriptions && currentUser.subscriptions.length">
+            <h3 class="subscription-title">用户订阅 ({{currentUser.subscriptions.length}})</h3>
+            <el-table :data="currentUser.subscriptions" border size="small" style="width: 100%; margin-top: 10px;">
+              <el-table-column label="地点" prop="location" width="45%">
+                <template #default="scope">
+                  {{ scope.row.location.province }} {{ scope.row.location.city }}
+                </template>
+              </el-table-column>
+              <el-table-column label="阈值类型" width="15%">
+                <template #default="scope">
+                  {{ scope.row.thresholdType === 1 ? 'AQI' : 'PM2.5' }}
+                </template>
+              </el-table-column>
+              <el-table-column prop="thresholdValue" label="阈值" width="10%" />
+              <el-table-column label="状态" width="20%">
+                <template #default="scope">
+                  <el-tag :type="scope.row.status === 1 ? 'success' : 'info'" size="small">
+                    {{ scope.row.status === 1 ? '启用' : '禁用' }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
+          
+          <div class="notification-info" v-if="currentUser.notificationCount !== undefined">
+            <el-statistic title="通知数量" :value="currentUser.notificationCount">
+              <template #suffix>
+                <el-tag size="small" effect="plain">条</el-tag>
               </template>
-            </el-popconfirm>
-          </template>
-        </el-table-column>
-      </el-table>
+            </el-statistic>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="dialogVisible = false">关闭</el-button>
+          <el-button 
+            type="primary" 
+            @click="handleUserStatusInDialog" 
+            :class="{ 'danger-button': currentUser && currentUser.status === 1 }"
+          >
+            {{ currentUser && currentUser.status === 1 ? '禁用用户' : '启用用户' }}
+          </el-button>
+        </span>
+      </template>
     </el-dialog>
   </div>
 </template>
 
 <script>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import axios from 'axios'
+import { View, Search, Refresh, UserFilled } from '@element-plus/icons-vue'
 
 export default {
   name: 'Users',
   setup() {
-    // 状态定义
-    const loading = ref(false)
+    const allUsers = ref([]) // 所有用户数据
     const users = ref([])
-    const dashboard = ref(null)
-    const searchKeyword = ref('')
+    const loading = ref(false)
     const currentPage = ref(1)
     const pageSize = ref(10)
-    const totalUsers = ref(0)
-    const subscriptionDialogVisible = ref(false)
-    const subscriptionLoading = ref(false)
-    const userSubscriptions = ref([])
+    const searchQuery = ref('')
+    const selectedUsers = ref([])
+    const dialogVisible = ref(false)
     const currentUser = ref(null)
+    const defaultAvatarUrl = 'https://cube.elemecdn.com/3/7c/3ea6beec64369c2642b92c6726f1epng.png'
 
-    // 计算属性 - 筛选后的用户列表
+    // 过滤后的用户列表
     const filteredUsers = computed(() => {
-      if (!searchKeyword.value) {
-        const start = (currentPage.value - 1) * pageSize.value
-        const end = start + pageSize.value
-        return users.value.slice(start, end)
-      }
+      if (!searchQuery.value) return allUsers.value
       
-      const filtered = users.value.filter(user => {
-        const keyword = searchKeyword.value.toLowerCase()
-        return user.username.toLowerCase().includes(keyword) || 
-               (user.email && user.email.toLowerCase().includes(keyword))
-      })
-      
-      totalUsers.value = filtered.length
-      return filtered.slice(
-        (currentPage.value - 1) * pageSize.value,
-        currentPage.value * pageSize.value
+      const query = searchQuery.value.toLowerCase()
+      return allUsers.value.filter(user => 
+        user.username.toLowerCase().includes(query) || 
+        user.email.toLowerCase().includes(query)
       )
     })
 
-    // 获取仪表盘数据
-    const fetchDashboard = async () => {
-      try {
-        const response = await axios.get('/api/admin/dashboard')
-        if (response.data.code === 200) {
-          dashboard.value = response.data.data
-        }
-      } catch (error) {
-        console.error('获取仪表盘数据失败:', error)
-        ElMessage.error('获取仪表盘数据失败')
-      }
-    }
+    // 当前页的用户列表
+    const pagedUsers = computed(() => {
+      const start = (currentPage.value - 1) * pageSize.value
+      const end = start + pageSize.value
+      return filteredUsers.value.slice(start, end)
+    })
 
-    // 获取所有用户数据
     const fetchUsers = async () => {
       loading.value = true
       try {
-        const response = await axios.get('/api/admin/users')
-        if (response.data.code === 200) {
-          users.value = response.data.data
-          totalUsers.value = users.value.length
-        }
+        const response = await axios.get('/api/admin/users', {
+          params: {
+            page: 0,
+            size: 1000 // 获取较大数量的用户，前端分页
+          }
+        })
+        allUsers.value = response.data.data.content
+        
+        // 重置分页
+        currentPage.value = 1
       } catch (error) {
-        console.error('获取用户列表失败:', error)
         ElMessage.error('获取用户列表失败')
+        console.error('Error fetching users:', error)
       } finally {
         loading.value = false
       }
     }
 
-    // 改变用户状态
+    const handleSearch = () => {
+      currentPage.value = 1 // 搜索时重置到第一页
+    }
+
     const handleStatusChange = async (user) => {
       try {
-        const response = await axios.put(`/api/admin/users/${user.id}/status?status=${user.status}`)
-        if (response.data.code === 200) {
-          ElMessage.success(`用户 ${user.username} 状态已更新`)
-        }
+        await axios.put(`/api/admin/users/${user.id}/status?status=${user.status}`)
+        ElMessage.success({
+          message: `用户 ${user.username} ${user.status === 1 ? '已启用' : '已禁用'}`,
+          type: 'success'
+        })
       } catch (error) {
-        console.error('更新用户状态失败:', error)
+        user.status = user.status === 1 ? 0 : 1 // 恢复原状态
         ElMessage.error('更新用户状态失败')
-        // 恢复原状态
-        user.status = user.status === 1 ? 0 : 1
+        console.error('Error updating user status:', error)
       }
     }
 
-    // 查看用户订阅
-    const showUserSubscriptions = async (user) => {
-      subscriptionDialogVisible.value = true
-      currentUser.value = user
-      subscriptionLoading.value = true
+    const bulkSetStatus = async (status) => {
+      ElMessageBox.confirm(
+        `确定要${status === 1 ? '启用' : '禁用'}选中的 ${selectedUsers.value.length} 个用户吗？`,
+        '批量操作确认',
+        {
+          confirmButtonText: '确认',
+          cancelButtonText: '取消',
+          type: 'warning',
+        }
+      ).then(async () => {
+        loading.value = true
+        try {
+          const promises = selectedUsers.value.map(user => 
+            axios.put(`/api/admin/users/${user.id}/status?status=${status}`)
+          )
+          await Promise.all(promises)
+          
+          // 更新本地状态
+          selectedUsers.value.forEach(selectedUser => {
+            const user = allUsers.value.find(u => u.id === selectedUser.id)
+            if (user) {
+              user.status = status
+            }
+          })
+          
+          ElMessage.success(`批量${status === 1 ? '启用' : '禁用'}操作成功`)
+          clearSelection()
+        } catch (error) {
+          ElMessage.error('批量操作失败')
+          console.error('Error in bulk operation:', error)
+        } finally {
+          loading.value = false
+        }
+      }).catch(() => {
+        ElMessage.info('已取消操作')
+      })
+    }
+
+    const handleSelectionChange = (selection) => {
+      selectedUsers.value = selection
+    }
+
+    const clearSelection = () => {
+      selectedUsers.value = []
+    }
+
+    const handleSizeChange = (val) => {
+      pageSize.value = val
+    }
+
+    const handleCurrentChange = (val) => {
+      currentPage.value = val
+    }
+
+    const refreshData = () => {
+      fetchUsers()
+      ElMessage({
+        message: '数据已刷新',
+        type: 'success',
+        duration: 1500
+      })
+    }
+
+    const viewUserDetails = (user) => {
+      loading.value = true
+      axios.get(`/api/admin/users/${user.id}`)
+        .then(response => {
+          if (response.data.code === 200) {
+            currentUser.value = response.data.data
+            dialogVisible.value = true
+          } else {
+            ElMessage.error('获取用户详情失败')
+          }
+        })
+        .catch(error => {
+          ElMessage.error('获取用户详情失败')
+          console.error('Error fetching user details:', error)
+        })
+        .finally(() => {
+          loading.value = false
+        })
+    }
+
+    const handleUserStatusInDialog = async () => {
+      if (!currentUser.value) return
       
+      const newStatus = currentUser.value.status === 1 ? 0 : 1
       try {
-        const response = await axios.get('/api/admin/subscriptions')
-        if (response.data.code === 200) {
-          // 筛选出当前用户的订阅
-          userSubscriptions.value = response.data.data.filter(
-            sub => sub.userId === user.id
-          )
-        }
-      } catch (error) {
-        console.error('获取订阅列表失败:', error)
-        ElMessage.error('获取订阅列表失败')
-      } finally {
-        subscriptionLoading.value = false
-      }
-    }
-
-    // 删除用户订阅
-    const handleDeleteSubscription = async (subscription) => {
-      try {
-        const response = await axios.delete(
-          `/api/admin/users/${currentUser.value.id}/subscriptions/${subscription.id}`
-        )
+        await axios.put(`/api/admin/users/${currentUser.value.id}/status?status=${newStatus}`)
         
-        if (response.data.code === 200) {
-          ElMessage.success('订阅删除成功')
-          // 从列表中移除已删除的订阅
-          userSubscriptions.value = userSubscriptions.value.filter(
-            sub => sub.id !== subscription.id
-          )
+        // 更新对话框中的用户状态
+        currentUser.value.status = newStatus
+        
+        // 同时更新表格中的对应用户
+        const userInTable = allUsers.value.find(u => u.id === currentUser.value.id)
+        if (userInTable) {
+          userInTable.status = newStatus
         }
+        
+        ElMessage.success(`用户 ${currentUser.value.username} ${newStatus === 1 ? '已启用' : '已禁用'}`)
       } catch (error) {
-        console.error('删除订阅失败:', error)
-        ElMessage.error('删除订阅失败')
+        ElMessage.error('更新用户状态失败')
+        console.error('Error updating user status:', error)
       }
     }
 
-    // 分页相关方法
-    const handleSizeChange = (size) => {
-      pageSize.value = size
-      currentPage.value = 1
-    }
-
-    const handleCurrentChange = (page) => {
-      currentPage.value = page
-    }
-
-    // 搜索方法
-    const handleSearch = () => {
-      currentPage.value = 1
-    }
-
-    // 格式化日期
-    const formatDate = (dateStr) => {
-      if (!dateStr) return '未知'
-      const date = new Date(dateStr)
-      return date.toLocaleString('zh-CN', {
+    const formatDate = (dateString) => {
+      if (!dateString) return '暂无记录'
+      return new Date(dateString).toLocaleString('zh-CN', {
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
@@ -339,63 +396,43 @@ export default {
       })
     }
 
-    // 获取阈值类型名称
-    const getThresholdTypeName = (type) => {
-      const types = {
-        1: 'AQI >',
-        2: 'PM2.5 >',
-        3: 'PM10 >',
-        4: 'CO >',
-        5: 'NO2 >',
-        6: 'SO2 >',
-        7: 'O3 >'
-      }
-      return types[type] || `类型${type} >`
+    const avatarUrl = (user) => {
+      // 根据用户名生成随机颜色的头像
+      return `https://ui-avatars.com/api/?name=${encodeURIComponent(user.username)}&background=random&color=fff&size=128`
     }
 
-    // 获取阈值类型对应的标签样式
-    const getThresholdTypeTag = (type) => {
-      const tags = {
-        1: 'danger',
-        2: 'warning',
-        3: 'warning',
-        4: 'info',
-        5: 'info',
-        6: 'info',
-        7: 'info'
-      }
-      return tags[type] || 'info'
-    }
-
-    // 组件挂载时加载数据
     onMounted(() => {
-      fetchDashboard()
       fetchUsers()
     })
 
     return {
-      loading,
       users,
-      dashboard,
       filteredUsers,
-      searchKeyword,
+      pagedUsers,
+      loading,
       currentPage,
       pageSize,
-      totalUsers,
-      subscriptionDialogVisible,
-      subscriptionLoading,
-      userSubscriptions,
+      searchQuery,
+      selectedUsers,
+      dialogVisible,
       currentUser,
-      fetchUsers,
       handleStatusChange,
-      showUserSubscriptions,
-      handleDeleteSubscription,
       handleSizeChange,
       handleCurrentChange,
-      handleSearch,
+      handleSelectionChange,
+      clearSelection,
+      bulkSetStatus,
       formatDate,
-      getThresholdTypeName,
-      getThresholdTypeTag
+      handleSearch,
+      refreshData,
+      viewUserDetails,
+      handleUserStatusInDialog,
+      avatarUrl,
+      View,
+      Search,
+      Refresh,
+      UserFilled,
+      defaultAvatarUrl
     }
   }
 }
@@ -406,102 +443,157 @@ export default {
   padding: 20px;
 }
 
-.dashboard-stats {
-  margin-bottom: 20px;
-}
-
-.stat-card {
-  display: flex;
-  align-items: center;
-  padding: 10px;
-  transition: all 0.3s;
-}
-
-.stat-card:hover {
-  transform: translateY(-5px);
-}
-
-.stat-icon {
-  font-size: 40px;
-  color: #409EFF;
-  margin-right: 20px;
-  display: flex;
-  align-items: center;
-}
-
-.stat-content {
-  flex: 1;
-}
-
-.stat-value {
-  font-size: 24px;
-  font-weight: bold;
-  margin-bottom: 5px;
-  color: #303133;
-}
-
-.stat-label {
-  font-size: 14px;
-  color: #909399;
-}
-
 .main-card {
-  margin-bottom: 20px;
+  transition: all 0.3s;
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 18px;
-  font-weight: bold;
+  flex-wrap: wrap;
+  gap: 16px;
 }
 
-.header-actions {
+.left-area {
   display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.title {
+  font-size: 20px;
+  font-weight: bold;
+  color: #303133;
+}
+
+.header-operations {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.filter-buttons {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.search-input {
+  width: 240px;
+}
+
+.pagination-container {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+}
+
+.bulk-actions {
+  margin-bottom: 16px;
+}
+
+.bulk-actions-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+:deep(.el-card__header) {
+  padding: 16px 20px;
+  border-bottom: 1px solid #ebeef5;
+  background-color: #f8f9fa;
+}
+
+:deep(.el-table) {
+  margin: 16px 0;
+  border-radius: 4px;
+  overflow: hidden;
+  table-layout: fixed;
+}
+
+:deep(.el-table__header) {
+  font-weight: bold;
+  width: 100% !important;
+}
+
+:deep(.el-table__header-wrapper table),
+:deep(.el-table__body-wrapper table) {
+  width: 100% !important;
+}
+
+:deep(.el-tag) {
+  text-align: center;
+  min-width: 80px;
+}
+
+.user-details {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  padding: 10px;
+}
+
+.user-avatar {
+  display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 10px;
 }
 
-.search-input {
-  width: 250px;
+.detail-item {
+  width: 100%;
 }
 
-.status-text {
-  margin-left: 8px;
-  font-size: 13px;
-  color: #909399;
+.danger-button {
+  --el-button-hover-text-color: var(--el-color-danger);
+  --el-button-hover-border-color: var(--el-color-danger);
+  --el-button-hover-bg-color: var(--el-color-danger-light-9);
 }
 
-.user-table {
-  margin: 20px 0;
+@media screen and (max-width: 768px) {
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .header-operations {
+    width: 100%;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .search-input {
+    width: 100%;
+  }
+  
+  .filter-buttons {
+    width: 100%;
+    flex-wrap: wrap;
+  }
 }
 
-.pagination-container {
-  display: flex;
-  justify-content: flex-end;
+:deep(.user-detail-dialog .el-dialog) {
+  margin: 0 auto !important;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.subscription-section {
+  width: 100%;
   margin-top: 20px;
 }
 
-.dialog-header {
-  margin-bottom: 15px;
-  padding-bottom: 15px;
-  border-bottom: 1px solid #EBEEF5;
-}
-
-.user-info {
+.subscription-title {
+  margin-bottom: 10px;
   font-size: 16px;
-  font-weight: bold;
-}
-
-.location-info {
-  display: flex;
-  flex-direction: column;
-}
-
-.location-coords {
-  font-size: 12px;
-  color: #909399;
-  margin-top: 5px;
+  color: #606266;
+  text-align: left;
 }
 </style>
