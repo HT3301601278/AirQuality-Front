@@ -100,6 +100,7 @@
               end-placeholder="结束日期"
               format="YYYY-MM-DD"
               style="width: 100%"
+              :disabled-date="disabledDate"
             />
           </template>
           <template v-else>
@@ -111,6 +112,7 @@
                   placeholder="选择日期1"
                   format="YYYY-MM-DD"
                   style="width: 100%"
+                  :disabled-date="disabledDate"
                 />
               </el-col>
               <el-col :xs="24" :sm="12">
@@ -120,6 +122,7 @@
                   placeholder="选择日期2"
                   format="YYYY-MM-DD"
                   style="width: 100%"
+                  :disabled-date="disabledDate"
                 />
               </el-col>
             </el-row>
@@ -366,6 +369,11 @@ export default {
         specificDate1.value = ''
         specificDate2.value = ''
       }
+    }
+
+    const disabledDate = (time) => {
+      // 禁用2020年12月31日之前的日期
+      return time.getTime() < new Date('2020-12-31').getTime()
     }
 
     const compareData = async () => {
