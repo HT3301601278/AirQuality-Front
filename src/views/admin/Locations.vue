@@ -7,7 +7,7 @@
             <i class="el-icon-location-information" />
             <span>位置管理</span>
           </div>
-          <el-button type="primary" @click="handleAdd" icon="plus" round>添加位置</el-button>
+          <el-button type="primary" @click="handleAdd" round>添加位置</el-button>
         </div>
       </template>
       
@@ -25,8 +25,8 @@
             </el-select>
           </el-form-item>
           <el-form-item>
-            <el-button type="primary" @click="handleSearch" icon="search" class="text-center-btn">搜索</el-button>
-            <el-button @click="resetSearch" icon="refresh" class="text-center-btn">重置</el-button>
+            <el-button type="primary" @click="handleSearch" class="text-center-btn">搜索</el-button>
+            <el-button @click="resetSearch" class="text-center-btn">重置</el-button>
           </el-form-item>
         </el-form>
       </div>
@@ -51,8 +51,8 @@
           <el-table-column label="操作" width="17%" align="center">
             <template #default="scope">
               <div class="action-buttons">
-                <el-button size="small" type="primary" @click="handleEdit(scope.row)" plain icon="edit">编辑</el-button>
-                <el-button size="small" type="danger" @click="handleDelete(scope.row)" plain icon="delete">删除</el-button>
+                <el-button size="small" type="primary" @click="handleEdit(scope.row)" plain>编辑</el-button>
+                <el-button size="small" type="danger" @click="handleDelete(scope.row)" plain>删除</el-button>
               </div>
             </template>
           </el-table-column>
@@ -542,8 +542,15 @@ export default {
 
 /* 确保按钮中的文字居中 */
 .text-center-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* 应用到所有按钮 */
+:deep(.el-button) {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 </style> 
