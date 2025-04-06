@@ -58,7 +58,9 @@
             <el-dropdown trigger="click">
               <div class="avatar-container">
                 <span class="username">{{ username }}</span>
-                <el-avatar :size="30" class="user-avatar">{{ username ? username.charAt(0).toUpperCase() : 'U' }}</el-avatar>
+                <el-avatar :size="30" :src="userAvatar" class="user-avatar">
+                  {{ username ? username.charAt(0).toUpperCase() : 'U' }}
+                </el-avatar>
               </div>
               <template #dropdown>
                 <el-dropdown-menu>
@@ -102,6 +104,9 @@ export default {
     // 获取用户名
     const username = computed(() => store.state.user.username)
     
+    // 获取用户头像
+    const userAvatar = computed(() => store.state.user.avatar)
+    
     // 退出登录
     const handleLogout = () => {
       ElMessageBox.confirm('确定要退出登录吗?', '提示', {
@@ -116,6 +121,7 @@ export default {
     
     return {
       username,
+      userAvatar,
       handleLogout
     }
   }
