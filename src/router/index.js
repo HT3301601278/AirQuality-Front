@@ -73,6 +73,12 @@ const routes = [
         name: 'map',
         component: () => import('../views/user/Map.vue'),
         meta: { title: '空气质量地图' }
+      },
+      {
+        path: 'info',
+        name: 'userInfo',
+        component: () => import('../views/user/UserInfo.vue'),
+        meta: { title: '个人信息' }
       }
     ]
   },
