@@ -50,6 +50,11 @@
               <el-option label="全部" value="" />
               <el-option label="AQI" value="1" />
               <el-option label="PM2.5" value="2" />
+              <el-option label="PM10" value="3" />
+              <el-option label="SO2" value="4" />
+              <el-option label="NO2" value="5" />
+              <el-option label="O3" value="6" />
+              <el-option label="CO" value="7" />
             </el-select>
             <el-button type="primary" @click="refreshNotifications">刷新</el-button>
           </div>
@@ -63,8 +68,9 @@
         stripe
         border
         :header-cell-style="{ background: '#f5f7fa', color: '#606266' }"
+        @sort-change="handleSortChange"
       >
-        <el-table-column prop="id" label="ID" width="80" />
+        <el-table-column prop="id" label="ID" width="80" sortable />
         <el-table-column label="用户信息" width="150">
           <template #default="scope">
             <div>
@@ -95,7 +101,7 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="createdAt" label="创建时间" width="180">
+        <el-table-column prop="createdAt" label="创建时间" width="180" sortable>
           <template #default="scope">
             {{ formatDateTime(scope.row.createdAt) }}
           </template>
@@ -159,6 +165,8 @@ export default {
     const thresholdTypeFilter = ref('')
     const currentPage = ref(1)
     const pageSize = ref(10)
+    const sortColumn = ref('createdAt')
+    const sortOrder = ref('descending')
 
     const fetchNotifications = async () => {
       loading.value = true
@@ -263,6 +271,25 @@ export default {
         )
       }
 
+      // 按ID排序
+      result.sort((a, b) => {
+        if (sortColumn.value === 'id') {
+          return sortOrder.value === 'ascending' ? a.id - b.id : b.id - a.id
+        }
+        // 按创建时间排序
+        else if (sortColumn.value === 'createdAt') {
+          const dateA = new Date(a.createdAt).getTime()
+          const dateB = new Date(b.createdAt).getTime()
+          return sortOrder.value === 'ascending' ? dateA - dateB : dateB - dateA
+        }
+        // 默认按创建时间降序
+        else {
+          const dateA = new Date(a.createdAt).getTime()
+          const dateB = new Date(b.createdAt).getTime()
+          return dateB - dateA
+        }
+      })
+
       return result
     })
 
@@ -284,6 +311,17 @@ export default {
       searchQuery.value = ''
     }
 
+    const handleSortChange = (column) => {
+      if (column.prop) {
+        sortColumn.value = column.prop
+        sortOrder.value = column.order || 'descending'
+      } else {
+        // 重置为默认排序
+        sortColumn.value = 'createdAt'
+        sortOrder.value = 'descending'
+      }
+    }
+
     const formatDateTime = (dateTimeStr) => {
       const date = new Date(dateTimeStr)
       return date.toLocaleString('zh-CN', {
@@ -299,7 +337,12 @@ export default {
     const getThresholdTypeName = (type) => {
       const types = {
         1: 'AQI',
-        2: 'PM2.5'
+        2: 'PM2.5',
+        3: 'PM10',
+        4: 'SO2',
+        5: 'NO2',
+        6: 'O3',
+        7: 'CO'
       }
       return types[type] || `未知(${type})`
     }
@@ -331,6 +374,8 @@ export default {
       thresholdTypeFilter,
       currentPage,
       pageSize,
+      sortColumn,
+      sortOrder,
       totalNotifications,
       unreadNotifications,
       readNotifications,
@@ -340,6 +385,7 @@ export default {
       handleSizeChange,
       handleCurrentChange,
       handleSearchClear,
+      handleSortChange,
       formatDateTime,
       getThresholdTypeName
     }
