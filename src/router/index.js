@@ -105,6 +105,12 @@ const routes = [
         name: 'notifications',
         component: () => import('../views/admin/Notifications.vue'),
         meta: { title: '通知管理' }
+      },
+      {
+        path: 'info',
+        name: 'adminInfo',
+        component: () => import('../views/admin/UserInfo.vue'),
+        meta: { title: '个人信息' }
       }
     ]
   }
