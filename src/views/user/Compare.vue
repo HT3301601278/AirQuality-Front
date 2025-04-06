@@ -1,9 +1,47 @@
 <template>
   <div class="compare-container">
-    <el-card class="city-select-card">
+    <el-card class="compare-mode-card">
       <template #header>
         <div class="card-header">
-          <span>城市数据对比</span>
+          <span>对比模式</span>
+        </div>
+      </template>
+      
+      <div class="compare-mode-content">
+        <el-radio-group v-model="compareType" @change="handleCompareTypeChange">
+          <el-radio-button label="historical">多城市时间段对比</el-radio-button>
+          <el-radio-button label="specific-dates">单城市多日期对比</el-radio-button>
+        </el-radio-group>
+        
+        <div class="compare-mode-description mt-10">
+          <el-alert
+            v-if="compareType === 'historical'"
+            type="info"
+            show-icon
+            :closable="false"
+          >
+            <template #title>在同一时间段内对比多个城市的空气质量数据</template>
+            <p>您可以选择2-5个城市和一个时间段，比较这些城市在该时间段内的空气质量指标</p>
+          </el-alert>
+          
+          <el-alert
+            v-else
+            type="info"
+            show-icon
+            :closable="false"
+          >
+            <template #title>对比同一城市在不同日期的空气质量数据</template>
+            <p>您可以选择一个城市和两个不同的日期，比较该城市在这两天的空气质量指标变化</p>
+          </el-alert>
+        </div>
+      </div>
+    </el-card>
+
+    <!-- 多城市时间段对比 -->
+    <el-card v-if="compareType === 'historical'" class="city-select-card">
+      <template #header>
+        <div class="card-header">
+          <span>选择多个城市</span>
           <el-button type="primary" size="small" @click="compareData" :disabled="!canCompare">
             开始对比
           </el-button>
@@ -74,38 +112,86 @@
             添加城市(最多5个)
           </el-button>
         </div>
+        
+        <div class="time-selector mt-20">
+          <div class="time-selector-title">选择时间段：</div>
+          <el-date-picker
+            v-model="dateRange"
+            type="daterange"
+            range-separator="至"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            format="YYYY-MM-DD"
+            style="width: 100%"
+            :disabled-date="disabledDate"
+          />
+        </div>
       </div>
     </el-card>
 
-    <el-card class="compare-type-card">
+    <!-- 单城市多日期对比 -->
+    <el-card v-else class="city-select-card">
       <template #header>
         <div class="card-header">
-          <span>对比类型</span>
+          <span>选择城市和对比日期</span>
+          <el-button type="primary" size="small" @click="compareData" :disabled="!canCompare">
+            开始对比
+          </el-button>
         </div>
       </template>
       
-      <div class="compare-type-content">
-        <el-radio-group v-model="compareType" @change="handleCompareTypeChange">
-          <el-radio-button label="historical">自定义时间段对比</el-radio-button>
-          <el-radio-button label="specific-dates">特定日期对比</el-radio-button>
-        </el-radio-group>
-
-        <div class="time-selector mt-20">
-          <template v-if="compareType === 'historical'">
-            <el-date-picker
-              v-model="dateRange"
-              type="daterange"
-              range-separator="至"
-              start-placeholder="开始日期"
-              end-placeholder="结束日期"
-              format="YYYY-MM-DD"
-              style="width: 100%"
-              :disabled-date="disabledDate"
-            />
-          </template>
-          <template v-else>
+      <div class="city-select-content">
+        <div class="city-select-item">
+          <div class="city-select-header">
+            <span>选择城市</span>
+          </div>
+          
+          <el-form :model="singleCity" label-position="top">
             <el-row :gutter="20">
               <el-col :xs="24" :sm="12">
+                <el-form-item label="省份">
+                  <el-select 
+                    v-model="singleCity.province" 
+                    placeholder="请选择省份" 
+                    @change="handleSingleProvinceChange"
+                    style="width: 100%"
+                  >
+                    <el-option
+                      v-for="province in provinces"
+                      :key="province"
+                      :label="province"
+                      :value="province"
+                    />
+                  </el-select>
+                </el-form-item>
+              </el-col>
+              <el-col :xs="24" :sm="12">
+                <el-form-item label="城市">
+                  <el-select 
+                    v-model="singleCity.cityId" 
+                    placeholder="请选择城市" 
+                    :disabled="!singleCity.province"
+                    style="width: 100%"
+                  >
+                    <el-option
+                      v-for="cityOption in singleCity.cities"
+                      :key="cityOption.id"
+                      :label="cityOption.city"
+                      :value="cityOption.id"
+                    />
+                  </el-select>
+                </el-form-item>
+              </el-col>
+            </el-row>
+          </el-form>
+        </div>
+        
+        <div class="date-comparison mt-20">
+          <div class="date-comparison-title">选择对比日期：</div>
+          <el-row :gutter="20" class="mt-10">
+            <el-col :xs="24" :sm="12">
+              <div class="date-item">
+                <div class="date-label">日期1：</div>
                 <el-date-picker
                   v-model="specificDate1"
                   type="date"
@@ -114,8 +200,11 @@
                   style="width: 100%"
                   :disabled-date="disabledDate"
                 />
-              </el-col>
-              <el-col :xs="24" :sm="12">
+              </div>
+            </el-col>
+            <el-col :xs="24" :sm="12">
+              <div class="date-item">
+                <div class="date-label">日期2：</div>
                 <el-date-picker
                   v-model="specificDate2"
                   type="date"
@@ -124,9 +213,9 @@
                   style="width: 100%"
                   :disabled-date="disabledDate"
                 />
-              </el-col>
-            </el-row>
-          </template>
+              </div>
+            </el-col>
+          </el-row>
         </div>
       </div>
     </el-card>
@@ -252,6 +341,7 @@ export default {
       { province: '', cityId: null, cityName: '', cities: [], visible: true, healthRecommendation: '' },
       { province: '', cityId: null, cityName: '', cities: [], visible: true, healthRecommendation: '' }
     ])
+    const singleCity = ref({ province: '', cityId: null, cityName: '', cities: [], visible: true, healthRecommendation: '' })
     const compareType = ref('historical')
     const dateRange = ref([])
     const specificDate1 = ref('')
@@ -288,11 +378,12 @@ export default {
     const lineChartMetric = ref('aqi')
 
     const canCompare = computed(() => {
-      const hasCities = selectedCities.value.filter(city => city.cityId).length >= 2
       if (compareType.value === 'historical') {
+        const hasCities = selectedCities.value.filter(city => city.cityId).length >= 2
         return hasCities && dateRange.value && dateRange.value.length === 2
       } else {
-        return hasCities && specificDate1.value && specificDate2.value
+        // 特定日期对比模式，只需要一个城市和两个日期
+        return singleCity.value.cityId && specificDate1.value && specificDate2.value
       }
     })
 
@@ -331,6 +422,22 @@ export default {
       }
     }
 
+    const handleSingleProvinceChange = async () => {
+      try {
+        singleCity.value.cityId = null
+        singleCity.value.cityName = ''
+        singleCity.value.cities = []
+        
+        const response = await axios.get(`/api/locations/cities?province=${singleCity.value.province}`)
+        if (response.data.code === 200) {
+          singleCity.value.cities = response.data.data
+        }
+      } catch (error) {
+        console.error('加载城市失败', error)
+        ElMessage.error('加载城市数据失败')
+      }
+    }
+
     watch(selectedCities, (newValue) => {
       newValue.forEach((city, index) => {
         if (city.cityId && city.cities.length > 0) {
@@ -340,6 +447,15 @@ export default {
           }
         }
       })
+    }, { deep: true })
+
+    watch(singleCity, (newValue) => {
+      if (newValue.cityId && newValue.cities.length > 0) {
+        const selectedCity = newValue.cities.find(c => c.id === newValue.cityId)
+        if (selectedCity) {
+          singleCity.value.cityName = selectedCity.city
+        }
+      }
     }, { deep: true })
 
     const addCity = () => {
@@ -360,14 +476,22 @@ export default {
     }
 
     const handleCompareTypeChange = () => {
+      // 重置所有输入
       if (compareType.value === 'historical') {
         dateRange.value = []
         specificDate1.value = ''
         specificDate2.value = ''
+        singleCity.value = { province: '', cityId: null, cityName: '', cities: [], visible: true, healthRecommendation: '' }
       } else {
         dateRange.value = []
         specificDate1.value = ''
         specificDate2.value = ''
+        // 保留第一个城市的数据
+        if (selectedCities.value.length > 0 && selectedCities.value[0].cityId) {
+          singleCity.value = { ...selectedCities.value[0] }
+        } else {
+          singleCity.value = { province: '', cityId: null, cityName: '', cities: [], visible: true, healthRecommendation: '' }
+        }
       }
     }
 
@@ -385,10 +509,11 @@ export default {
       
       try {
         const promises = []
-        const validCities = selectedCities.value.filter(city => city.cityId)
         
-        for (const city of validCities) {
-          if (compareType.value === 'historical') {
+        if (compareType.value === 'historical') {
+          const validCities = selectedCities.value.filter(city => city.cityId)
+          
+          for (const city of validCities) {
             const startTime = new Date(dateRange.value[0])
             const endTime = new Date(dateRange.value[1])
             startTime.setHours(0, 0, 0, 0)
@@ -400,29 +525,13 @@ export default {
             promises.push(
               axios.get(`/api/air-quality/historical/${city.cityId}?startTime=${startTimeStr}&endTime=${endTimeStr}`)
             )
-          } else {
-            const date1 = new Date(specificDate1.value)
-            const date2 = new Date(specificDate2.value)
-            date1.setHours(12, 0, 0, 0)
-            date2.setHours(12, 0, 0, 0)
-            
-            const date1Str = date1.toISOString().split('.')[0]
-            const date2Str = date2.toISOString().split('.')[0]
-            
-            promises.push(
-              axios.get(`/api/air-quality/compare-dates/${city.cityId}?date1=${date1Str}&date2=${date2Str}`)
-            )
           }
-        }
-        
-        const results = await Promise.all(promises)
-        
-        results.forEach((result, index) => {
-          if (result.data.code === 200) {
-            let cityData
-            
-            if (compareType.value === 'historical') {
-              cityData = {
+          
+          const results = await Promise.all(promises)
+          
+          results.forEach((result, index) => {
+            if (result.data.code === 200) {
+              const cityData = {
                 cityId: validCities[index].cityId,
                 cityName: validCities[index].cityName,
                 data: result.data.data
@@ -431,21 +540,52 @@ export default {
               if (result.data.data && result.data.data.length > 0) {
                 validCities[index].healthRecommendation = result.data.data[0].healthRecommendation
               }
-            } else {
-              cityData = {
-                cityId: validCities[index].cityId,
-                cityName: validCities[index].cityName,
-                data: result.data.data.flat()
-              }
               
-              if (result.data.data && result.data.data[0] && result.data.data[0].length > 0) {
-                validCities[index].healthRecommendation = result.data.data[0][0].healthRecommendation
-              }
+              comparisonData.value.push(cityData)
+            }
+          })
+        } else {
+          // 特定日期对比模式
+          if (!singleCity.value.cityId) return
+          
+          const date1 = new Date(specificDate1.value)
+          const date2 = new Date(specificDate2.value)
+          date1.setHours(12, 0, 0, 0)
+          date2.setHours(12, 0, 0, 0)
+          
+          const date1Str = date1.toISOString().split('.')[0]
+          const date2Str = date2.toISOString().split('.')[0]
+          
+          const response = await axios.get(
+            `/api/air-quality/compare-dates/${singleCity.value.cityId}?date1=${date1Str}&date2=${date2Str}`
+          )
+          
+          if (response.data.code === 200) {
+            // 创建两个虚拟"城市"，实际是同一城市的两个不同日期
+            const date1Display = date1.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })
+            const date2Display = date2.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })
+            
+            // 日期1的数据
+            if (response.data.data && response.data.data[0] && response.data.data[0].length > 0) {
+              comparisonData.value.push({
+                cityId: singleCity.value.cityId + '-date1',
+                cityName: `${singleCity.value.cityName} (${date1Display})`,
+                data: response.data.data[0]
+              })
+              
+              singleCity.value.healthRecommendation = response.data.data[0][0].healthRecommendation
             }
             
-            comparisonData.value.push(cityData)
+            // 日期2的数据
+            if (response.data.data && response.data.data[1] && response.data.data[1].length > 0) {
+              comparisonData.value.push({
+                cityId: singleCity.value.cityId + '-date2',
+                cityName: `${singleCity.value.cityName} (${date2Display})`,
+                data: response.data.data[1]
+              })
+            }
           }
-        })
+        }
         
         processTableData()
         
@@ -822,6 +962,7 @@ export default {
     return {
       provinces,
       selectedCities,
+      singleCity,
       compareType,
       dateRange,
       specificDate1,
@@ -832,11 +973,13 @@ export default {
       canCompare,
       
       handleProvinceChange,
+      handleSingleProvinceChange,
       addCity,
       removeCity,
       handleCompareTypeChange,
       compareData,
       handleMetricsChange,
+      disabledDate,
       
       barChart,
       radarChart,
@@ -870,8 +1013,8 @@ export default {
   font-weight: 600;
 }
 
+.compare-mode-card,
 .city-select-card,
-.compare-type-card,
 .compare-result-card {
   margin-bottom: 24px;
   border-radius: 8px;
@@ -879,15 +1022,18 @@ export default {
   transition: box-shadow 0.3s ease;
 }
 
+.compare-mode-card:hover,
 .city-select-card:hover,
-.compare-type-card:hover,
 .compare-result-card:hover {
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
 }
 
-.compare-type-card,
-.compare-result-card {
-  margin-top: 24px;
+.compare-mode-content {
+  padding: 16px;
+}
+
+.compare-mode-description {
+  margin-top: 16px;
 }
 
 .city-select-content {
@@ -925,6 +1071,40 @@ export default {
   display: flex;
   justify-content: center;
   margin-top: 12px;
+}
+
+.time-selector,
+.date-comparison {
+  padding: 16px;
+  background-color: #f8fafc;
+  border-radius: 8px;
+  margin-top: 20px;
+  border: 1px solid #ebeef5;
+}
+
+.time-selector-title,
+.date-comparison-title {
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: #303133;
+}
+
+.date-item {
+  margin-bottom: 12px;
+}
+
+.date-label {
+  margin-bottom: 8px;
+  color: #606266;
+  font-weight: 500;
+}
+
+.mt-10 {
+  margin-top: 10px;
+}
+
+.mt-20 {
+  margin-top: 20px;
 }
 
 :deep(.el-form-item) {
@@ -1082,47 +1262,5 @@ export default {
 
 :deep(.el-empty) {
   padding: 60px 0;
-}
-
-.compare-type-content {
-  padding: 16px;
-}
-
-.time-selector {
-  padding: 16px;
-  background-color: #f8fafc;
-  border-radius: 8px;
-  margin-top: 20px;
-}
-
-@media screen and (max-width: 768px) {
-  .compare-container {
-    padding: 12px;
-  }
-  
-  .city-select-item {
-    padding: 16px;
-  }
-  
-  .line-chart-controls {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 16px;
-  }
-  
-  .chart-container {
-    height: 350px;
-    padding: 12px;
-  }
-  
-  .health-recommendations, 
-  .data-table-container,
-  .metrics-selector {
-    padding: 12px;
-  }
-  
-  :deep(.el-tabs__item) {
-    padding: 0 16px;
-  }
 }
 </style>
