@@ -707,43 +707,52 @@ export default {
       // 完全重置图表选项，确保数据完全刷新
       lineChartInstance.clear();
       
-      const sortedData = {}
-      comparisonData.value.forEach((city, index) => {
-        // 找到对应的城市配置对象
+      // 获取所有可见城市的数据
+      const visibleCities = comparisonData.value.filter(city => {
         const cityObj = selectedCities.value.find(c => c.cityId === city.cityId);
-        if (!cityObj || !cityObj.visible) return;
-        
-        sortedData[city.cityId] = {}
+        return cityObj && cityObj.visible;
+      });
+      
+      // 收集所有时间点并排序
+      const allTimes = new Set();
+      visibleCities.forEach(city => {
         city.data.forEach(item => {
-          const date = new Date(item.dateTime)
-          sortedData[city.cityId][date.getTime()] = item
-        })
-      })
+          if (item.dateTime) {
+            const date = new Date(item.dateTime);
+            allTimes.add(date.getTime());
+          }
+        });
+      });
       
-      const allTimes = new Set()
-      Object.values(sortedData).forEach(cityData => {
-        Object.keys(cityData).forEach(time => allTimes.add(parseInt(time)))
-      })
-      
-      const timeArray = Array.from(allTimes).sort((a, b) => a - b)
+      const timeArray = Array.from(allTimes).sort((a, b) => a - b);
       
       const xAxisData = timeArray.map(time => {
-        const date = new Date(time)
-        return `${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:00`
-      })
+        const date = new Date(time);
+        return `${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:00`;
+      });
       
-      const series = []
+      const series = [];
       
-      // 只处理设置为可见的城市
-      comparisonData.value.forEach((city, index) => {
-        // 找到对应的城市配置对象
-        const cityObj = selectedCities.value.find(c => c.cityId === city.cityId);
-        if (!cityObj || !cityObj.visible) return;
+      // 为每个可见城市创建一个系列
+      visibleCities.forEach((city, index) => {
+        // 创建时间映射表，便于查找
+        const timeMap = {};
+        city.data.forEach(item => {
+          if (item.dateTime) {
+            const time = new Date(item.dateTime).getTime();
+            timeMap[time] = item;
+          }
+        });
         
+        // 为每个时间点创建数据，如果没有数据则连接相邻点
         const data = timeArray.map(time => {
-          const item = sortedData[city.cityId][time]
-          return item ? (parseFloat(item[lineChartMetric.value]) || 0) : null
-        })
+          const item = timeMap[time];
+          return item ? (parseFloat(item[lineChartMetric.value]) || 0) : '-'; // 使用'-'而不是null/undefined保持连线
+        });
+        
+        // 找到对应的城市对象以获取颜色信息
+        const cityIndex = selectedCities.value.findIndex(c => c.cityId === city.cityId);
+        const colorIndex = cityIndex >= 0 ? cityIndex : index;
         
         series.push({
           name: city.cityName,
@@ -752,26 +761,25 @@ export default {
           symbolSize: 6,
           data,
           smooth: true,
+          connectNulls: true, // 确保连接空值点
           lineStyle: {
             width: 2,
-            color: cityColors[index % cityColors.length]
+            color: cityColors[colorIndex % cityColors.length]
           },
           itemStyle: {
-            color: cityColors[index % cityColors.length]
+            color: cityColors[colorIndex % cityColors.length]
           }
-        })
-      })
+        });
+      });
       
-      const metricLabel = availableMetrics.find(m => m.value === lineChartMetric.value)?.label || lineChartMetric.value
+      const metricLabel = availableMetrics.find(m => m.value === lineChartMetric.value)?.label || lineChartMetric.value;
       
       const option = {
         tooltip: {
           trigger: 'axis'
         },
         legend: {
-          data: selectedCities.value
-            .filter(city => city.cityId && city.visible)
-            .map(city => city.cityName)
+          data: visibleCities.map(city => city.cityName)
         },
         grid: {
           left: '3%',
@@ -793,9 +801,9 @@ export default {
           name: metricLabel
         },
         series
-      }
+      };
       
-      lineChartInstance.setOption(option)
+      lineChartInstance.setOption(option, true);
     }
 
     const handleMetricsChange = () => {
